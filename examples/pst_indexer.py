@@ -7,6 +7,8 @@ import pypff
 import unicodecsv as csv
 from collections import Counter
 
+from psutil._compat import xrange
+
 __author__ = 'Preston Miller & Chapin Bryce'
 __date__ = '20160401'
 __version__ = 0.01

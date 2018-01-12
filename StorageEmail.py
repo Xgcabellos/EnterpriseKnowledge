@@ -1,35 +1,11 @@
 # version v1.1
-import smtplib
-import time
-import imaplib
-import email
+import json
+import os
 import re
-import os
-import sys
-import mailbox
-import email
-import quopri
-import json
-import time
-
-import EmailProcess
 from abc import ABCMeta, abstractmethod
-import imaplib
-import os
 
+from neo4j.v1 import GraphDatabase
 
-from bs4 import BeautifulSoup
-import email
-import quopri
-import json
-import time
-
-from py._xmlgen import unicode
-
-import ConnectionProperties
-from dateutil.parser import parse
-
-from neo4j.v1 import GraphDatabase, unicode
 
 class storage_email():
     """abstact class for reading emails from different services"""
@@ -46,14 +22,14 @@ class storage_email():
         raise RuntimeError('email_type abstact class')
 
     @abstractmethod
-    def store(self,msg_list):
+    def store(self, msg_list):
         """"Return a string representing the type of connection this is."""
         raise RuntimeError('store_email abstact class')
 
     def __del__(self):
         self.driver = None
 
-    def unify_name(self,name_raw):
+    def unify_name(self, name_raw):
         """clean names for use dem as unic names"""
         if name_raw != None:
             name_period = str.replace(name_raw, '.', '_')
@@ -91,7 +67,7 @@ class storage_email():
         return sender
 
 
-#driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "Gandalf"))
+# driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "Gandalf"))
 
 class neo4j_storage_email(storage_email):
     def __init__(self, driver):
@@ -101,17 +77,17 @@ class neo4j_storage_email(storage_email):
         """"Return a string representing the type of connection this is."""
         return 'neo4j'
 
-    def connect(self,url,login,pw):
-        self.driver=GraphDatabase.driver(url, auth=(login, pw))
+    def connect(self, url, login, pw):
+        self.driver = GraphDatabase.driver(url, auth=(login, pw))
         return self.driver
-    def __del__(self):
-        if self.open_db==True:
-            self.driver = self.driver.close()
 
+    def __del__(self):
+        if self.open_db == True:
+            self.driver = self.driver.close()
 
     @staticmethod
     def define_emailUser_constraint(tx):
-        send_text= "CREATE CONSTRAINT ON (user:EmailUser) ASSERT user.username IS UNIQUE  "
+        send_text = "CREATE CONSTRAINT ON (user:EmailUser) ASSERT user.username IS UNIQUE  "
         " CREATE CONSTRAINT ON (email:Emai) ASSERT email.id IS UNIQUE"
         tx.run(send_text)
 
@@ -129,7 +105,7 @@ class neo4j_storage_email(storage_email):
                "MERGE (b)-[s:SEND]->(c)"
                " ON CREATE  SET s.weith=3 , s.counter=1, s.accessTime = timestamp() "
                " ON MATCH SET s.counter = coalesce(s.counter, 0) + 1, s.weith=coalesce(s.weith, 0) + 3, s.accessTime = timestamp() ",
-               email_id=email_id, content=content,front=front, to=to)
+               email_id=email_id, content=content, front=front, to=to)
 
     @staticmethod
     def add_email_cc(tx, email_id, content, front, cc):
@@ -145,7 +121,7 @@ class neo4j_storage_email(storage_email):
                "MERGE (b)-[s:SEND]->(c)"
                " ON CREATE  SET s.weith=1 , s.counter=1, s.accessTime = timestamp() "
                " ON MATCH SET s.counter = coalesce(s.counter, 0) + 1, s.weith=coalesce(s.weith, 0) + 1, s.accessTime = timestamp() ",
-               email_id=email_id, content=content,front=front, cc=cc)
+               email_id=email_id, content=content, front=front, cc=cc)
 
     @staticmethod
     def add_email_bcc(tx, email_id, content, front, co):
@@ -161,75 +137,76 @@ class neo4j_storage_email(storage_email):
                "MERGE (b)-[s:SEND]->(c)"
                " ON CREATE  SET s.weith=4 , s.counter=1, s.accessTime = timestamp() "
                " ON MATCH SET s.counter = coalesce(s.counter, 0) + 1, s.weith=coalesce(s.weith, 0) + 4, s.accessTime = timestamp() ",
-               email_id=email_id, content=content,front=front, co=co)
+               email_id=email_id, content=content, front=front, co=co)
 
-    def store(self,msg_list):
-       """Return the tumber of message stored"""
-       i=0
-       for msg in msg_list:
+    def store(self, msg_list):
+        """Return the tumber of message stored"""
+        i = 0
+        for msg in msg_list:
             try:
                 i = i + 1
-                email_to=None
-                email_cc=None
-                email_bcc=None
+                email_to = None
+                email_cc = None
+                email_bcc = None
                 if (msg['from'] is None):
                     print('FROM DOESNT EXIST')
                     break
-                sender = self.clear_email( msg['from'].split(',')) #msg['from'].split(',')
+                sender = self.clear_email(msg['from'].split(','))  # msg['from'].split(',')
                 email_subject = msg['subject']
                 if (email_subject is None):
-                    email_subject="NA"
+                    email_subject = "NA"
                 if not (msg['To'] is None):
                     email_to = self.clear_email(msg['To'].split(','))
                 else:
-                     if not (msg['Delivered-To'] is None):
+                    if not (msg['Delivered-To'] is None):
                         email_to = self.clear_email(msg['Delivered-To'].split(','))
-                     else:
-                         print('TO DOESNT EXIST')
+                    else:
+                        print('TO DOESNT EXIST')
 
                 if (msg['Message-Id'] is None):
                     print('Message-Id DOESNT EXIST')
                     return
-                email_id=re.sub(r'[<>]', '', msg['Message-Id'])
+                email_id = re.sub(r'[<>]', '', msg['Message-Id'])
                 if not (msg['CC'] is None):
                     email_cc = self.clear_email(msg['CC'].split(','))
                 if not (msg['CO'] is None):
-                    email_bcc = self.clear_email( msg['Bcc'].split(','))
+                    email_bcc = self.clear_email(msg['Bcc'].split(','))
 
                 with self.driver.session() as session:
                     session.write_transaction(self.define_emailUser_constraint)
                     for front in sender:
                         for to in email_to:
-                            if front!=None and to!=None:
-                                session.write_transaction(self.add_email_to, email_id, email_subject, front.lower(), to.lower())
-                                print(' Id: ' + email_id + ' From:' +front.lower() + ' TO:' +to.lower())
+                            if front != None and to != None:
+                                session.write_transaction(self.add_email_to, email_id, email_subject, front.lower(),
+                                                          to.lower())
+                                print(' Id: ' + email_id + ' From:' + front.lower() + ' TO:' + to.lower())
                         if not (msg['CC'] is None):
                             for cc in email_cc:
                                 if front != None and cc != None:
-                                    session.write_transaction(self.add_email_cc, email_id, email_subject, front.lower(), cc.lower())
+                                    session.write_transaction(self.add_email_cc, email_id, email_subject, front.lower(),
+                                                              cc.lower())
                                     print(' Id: ' + email_id + ' From:' + front.lower() + ' CC:' + cc.lower())
                         if not (msg['Bcc'] is None):
                             for bcc in email_bcc:
                                 if front != None and bcc != None:
-                                    session.write_transaction(self.add_email_bcc, email_id, email_subject, front.lower(), bcc.lower())
+                                    session.write_transaction(self.add_email_bcc, email_id, email_subject,
+                                                              front.lower(), bcc.lower())
                                     print(' Id: ' + email_id + ' From:' + front.lower() + ' Bcc:' + bcc.lower())
 
             except Exception as read_exp:
                 print(str(read_exp))
 
-
-       return i
-
+        return i
 
 
 class file_storage_email():
     """abstact class for reading emails from different services"""
     driver = None
     open_db = False
-    directory=None
-    file_name=None
-    filename=None
-    initialized=False
+    directory = None
+    file_name = None
+    filename = None
+    initialized = False
 
     def __init__(self, driver):
         self.driver = driver
@@ -238,31 +215,28 @@ class file_storage_email():
         """"Return a string representing the type of connection this is."""
         return 'file'
 
-    def store_file (self,directory,file_name):
-        if self.driver!=None:
+    def store_file(self, directory, file_name):
+        if self.driver != None:
             self.driver.close()
-        self.directory=directory
-        self.file_name=file_name
+        self.directory = directory
+        self.file_name = file_name
         self.filename = os.path.join(self.directory, self.file_name)
         self.driver = open(self.filename, 'w')
-        self.initialized=True
+        self.initialized = True
         return self.driver
 
-
-    def store(self,jsonified_messages,directory=None,file_name=None ):
+    def store(self, jsonified_messages, directory=None, file_name=None):
         """"store the list of message in file in json format."""
 
         if directory is not None and file_name is not None:
             self.store_file(directory, file_name)
-        elif (self.driver==None):
+        elif (self.driver == None):
             raise Exception('error using file descriptor. it has not been initialized')
         self.driver.write(json.dumps(jsonified_messages))
-        if self.initialized==True:
+        if self.initialized == True:
             self.driver.close()
         print("Data written out to", self.driver.name)
         return jsonified_messages
 
-
     def __del__(self):
         self.driver = None
-

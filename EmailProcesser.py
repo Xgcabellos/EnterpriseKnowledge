@@ -1,13 +1,14 @@
 # version v1.1
 
-import ConnectionProperties
 import EmailProcess
-from StorageEmail import file_storage_email
+import ConnectionProperties
+
 from StorageEmail import neo4j_storage_email
+from StorageEmail import file_storage_email
 
 ORG_EMAIL   = "@gmail.com"
 FROM_EMAIL  = "xgcabellos" + ORG_EMAIL
-FROM_PWD = "xxxxxxxx"
+FROM_PWD    = "xxxxxxxxxxx"
 
 
 
@@ -18,8 +19,7 @@ FROM_PWD = "xxxxxxxx"
 #
 # ------------------------------------------------
 
-from neo4j.v1 import GraphDatabase
-
+from neo4j.v1 import GraphDatabase, unicode
 #10.162.41.156 - 192.168.1.105
 driver = GraphDatabase.driver("bolt://192.168.1.105:7687", auth=("neo4j", "Gandalf"))
 #becareful different depend operating system. it must to be done agnostic.

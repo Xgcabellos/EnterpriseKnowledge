@@ -8,7 +8,7 @@ from StorageEmail import neo4j_storage_email
 
 ORG_EMAIL   = "@gmail.com"
 FROM_EMAIL  = "xgcabellos" + ORG_EMAIL
-FROM_PWD = "Gandalf6981_0018"
+FROM_PWD = "+++++++++++++"
 
 
 

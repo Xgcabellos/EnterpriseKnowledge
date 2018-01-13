@@ -131,34 +131,33 @@ class pst_file(EmailProcess.abstract_email):
         """
         json_msg = {'parts': []}
         for (k, v) in msg.items():
+
             json_msg[k] = v  # .decode('utf-8', 'ignore')
 
-        # The To, Cc, and Bcc fields, if present, could have multiple items.
-        # Note that not all of these fields are necessarily defined.
+            # The To, Cc, and Bcc fields, if present, could have multiple items.
+            # Note that not all of these fields are necessarily defined.
 
-        for k in ['To', 'Cc', 'Bcc']:
-            if not json_msg.get(k):
-                continue
-            json_msg[k] = json_msg[k].replace('\n', '').replace('\t', '').replace('\r', '').replace(' ', '').split(
-                ',')  # .decode('utf-8', 'ignore').split(',')
-        for part in msg.walk():
-            json_part = {}
+        for k3 in ['To', 'Cc', 'Bcc']:
+            if k3 in json_msg:
+                json_msg[k3] = json_msg[k3].replace('\n', '').replace('\t', '').replace('\r', '').replace(' ', '')
+        json_part = {}
 
-            # print('content type: ' + part.get_content_maintype())
-            if part.get_content_maintype() == 'multipart':
-                continue
+        # print('content type: ' + part.get_content_maintype())
+        if 'Content-Type' or 'Content-type' in json_msg:
+            try:
+                json_part['contentType'] = json_msg['Content-Type']
+            except KeyError as ve:
+                json_part['contentType'] = json_msg['Content-type']
 
-            json_part['contentType'] = part.get_content_type()
-
-            if part.get_content_type() == 'text/plain':
-                json_part['content'] = unicode(part.get_payload(decode=True))
+            if json_part['contentType'] == 'text/plain':
+                json_part['content'] = unicode(json_msg['body'])
             else:
-                if part.get_content_type() == 'text/html':
-                    json_part['content'] = self.cleanContent(part.get_payload(decode=True))
+                if json_part['contentType'] == 'text/html':
+                    json_part['content'] = self.cleanContent(json_msg['body'])
                 else:
-                    json_part['content'] = part.get_content_maintype() + ' deleted for mapping json'
+                    json_part['content'] = json_part['contentType'] + ' deleted for mapping json'
 
-            json_msg['parts'].append(json_part)
+        json_msg['parts'].append(json_part)
 
         # Finally, convert date from asctime to milliseconds since epoch using the
         # $date descriptor so it imports "natively" as an ISODate object in MongoDB.
@@ -167,8 +166,16 @@ class pst_file(EmailProcess.abstract_email):
                 then = parse(json_msg['Date'])
                 millis = int(time.mktime(then.timetuple()) * 1000 + then.microsecond / 1000)
                 json_msg['Date'] = {'$date': millis}
-        except Exception as e:
+        except logging.error("error parsing Date :" + json_msg['Date'] + " Error:" + str(e)) as e:
             logging.error("error parsing Date :" + json_msg['Date'] + " Error:" + str(e))
+
+        for k2 in ['sender', 'header', 'body', 'Content-Type']:
+
+            try:
+                del json_msg[k2]
+            except KeyError as ke:
+                logging.debug("Deleting.  Error:" + str(ke))
+                del json_msg['Content-type']
 
         return json_msg
 
@@ -217,7 +224,8 @@ class pst_file(EmailProcess.abstract_email):
         # message_list = []
         for message in folder.sub_messages:
             message_dict = self.processMessage(message)
-            self.message_list.append(message_dict)
+            if not message_dict == None:
+                self.message_list.append(message_dict)
         self.folderReport(self.message_list, folder.name)
 
     def processMessage(self, message):
@@ -227,15 +235,21 @@ class pst_file(EmailProcess.abstract_email):
         :return: A dictionary with message fields (values) and their data (keys)
         """
         message_processed = {}
-        message_processed["subject"] = message.subject
+        message_processed["Subject"] = message.subject
         message_processed["sender"] = message.sender_name
         message_processed["header"] = message.transport_headers
+        if message.transport_headers == None:
+            return None
         message_processed["body"] = message.plain_text_body
         if not message.transport_headers is None:
             parser = HeaderParser()
             msg = parser.parsestr(message.transport_headers)
             for (k, v) in msg.items():
-                message_processed[k] = v
+                for k2 in ['From', 'To', 'Cc', 'Bcc', 'Return-Path', 'Date', 'Message-Id', 'Content-type',
+                           'Content-Transfer-Encoding']:
+                    if not str.lower(k) == str.lower(k2):
+                        continue
+                    message_processed[k] = v
         # try:
         #    message_processed["creation_time"] = message.creation_time
         # except Exception as creation_time_exp:

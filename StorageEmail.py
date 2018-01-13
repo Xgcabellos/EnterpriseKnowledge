@@ -148,12 +148,21 @@ class neo4j_storage_email(storage_email):
                 email_to = None
                 email_cc = None
                 email_bcc = None
-                if (msg['from'] is None):
-                    print('FROM DOESNT EXIST')
+                email_subject = None
+                sender = None
+
+                if 'from' in msg:
+                    sender = self.clear_email(msg['from'].split(','))  # msg['from'].split(',')
+                elif 'From' in msg:
+                    sender = self.clear_email(msg['From'].split(','))  # msg['from'].split(',')
+                else:
+                    print('FROM DOEST EXIST')
                     break
-                sender = self.clear_email(msg['from'].split(','))  # msg['from'].split(',')
-                email_subject = msg['subject']
-                if (email_subject is None):
+                if 'subject' in msg:
+                    email_subject = msg['subject']
+                elif 'Subject' in msg:
+                    email_subject = msg['Subject']
+                else:
                     email_subject = "NA"
                 if not (msg['To'] is None):
                     email_to = self.clear_email(msg['To'].split(','))
@@ -163,13 +172,24 @@ class neo4j_storage_email(storage_email):
                     else:
                         print('TO DOESNT EXIST')
 
-                if (msg['Message-Id'] is None):
-                    print('Message-Id DOESNT EXIST')
-                    return
-                email_id = re.sub(r'[<>]', '', msg['Message-Id'])
-                if not (msg['CC'] is None):
+                if 'Message-Id' in msg:
+                    if (msg['Message-Id'] is None):
+                        print('Message-Id DOESNT EXIST')
+                        return
+                    else:
+                        email_id = re.sub(r'[<>]', '', msg['Message-Id'])
+                elif 'Message-ID' in msg:
+                    if (msg['Message-ID'] is None):
+                        print('Message-ID DOESNT EXIST')
+                        return
+                    else:
+                        email_id = re.sub(r'[<>]', '', msg['Message-ID'])
+
+                if 'CC' in msg:
                     email_cc = self.clear_email(msg['CC'].split(','))
-                if not (msg['CO'] is None):
+                elif 'Cc' in msg:
+                    email_cc = self.clear_email(msg['Cc'].split(','))
+                if 'Bcc' in msg:
                     email_bcc = self.clear_email(msg['Bcc'].split(','))
 
                 with self.driver.session() as session:
@@ -180,13 +200,13 @@ class neo4j_storage_email(storage_email):
                                 session.write_transaction(self.add_email_to, email_id, email_subject, front.lower(),
                                                           to.lower())
                                 print(' Id: ' + email_id + ' From:' + front.lower() + ' TO:' + to.lower())
-                        if not (msg['CC'] is None):
+                        if not (email_cc is None):
                             for cc in email_cc:
                                 if front != None and cc != None:
                                     session.write_transaction(self.add_email_cc, email_id, email_subject, front.lower(),
                                                               cc.lower())
                                     print(' Id: ' + email_id + ' From:' + front.lower() + ' CC:' + cc.lower())
-                        if not (msg['Bcc'] is None):
+                        if not (email_bcc is None):
                             for bcc in email_bcc:
                                 if front != None and bcc != None:
                                     session.write_transaction(self.add_email_bcc, email_id, email_subject,

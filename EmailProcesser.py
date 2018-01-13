@@ -8,7 +8,7 @@ from StorageEmail import neo4j_storage_email
 
 ORG_EMAIL   = "@gmail.com"
 FROM_EMAIL  = "xgcabellos" + ORG_EMAIL
-FROM_PWD = "+++++++++++++"
+FROM_PWD = "xxxxxxxxxxxxxxxxxxxxxxxx"
 
 
 
@@ -26,12 +26,12 @@ driver = GraphDatabase.driver("bolt://192.168.1.105:7687", auth=("neo4j", "Ganda
 # driver = GraphDatabase.driver("bolt://110.162.41.156:7687", auth=("neo4j", "Gandalf"))
 #becareful different depend operating system. it must to be done agnostic.
 directory='./json/'
-test=False
-if test==True:
-    properties= ConnectionProperties.google_connexion_properties(ORG_EMAIL,"xgcabellos",FROM_PWD)
-    reader=EmailProcess.gmail(properties)
-    graph_store=neo4j_storage_email(driver)
-    json_store=file_storage_email(None)
+gmail = False
+graph_store = neo4j_storage_email(driver)
+json_store = file_storage_email(None)
+if gmail == True:
+    properties = ConnectionProperties.google_connexion_properties(ORG_EMAIL, "xgcabellos", FROM_PWD)
+    reader = EmailProcess.gmail(properties)
     for folder in reader.folder_list:
         name_folder = str(folder).split('"')[-2]
         if (name_folder.upper() != 'INBOX') and (name_folder.upper() != 'ENVIADO'):  ## be careful TEMPORAL
@@ -55,3 +55,9 @@ if test==True:
 else:
     pst = PstProcess.pst_file('../input/xavier.pst', './output', 'report.info', log_directory='output')
     pst.read_all()
+    jsonified_messages = pst.jsonizer_emails(pst.message_list)
+    file = pst.pst_name.split('/')[-1] + '.json'
+    print('prepared ' + str(len(jsonified_messages)) + ' json messages in ' + file)
+    json_store.store(jsonified_messages, directory, file)
+    start_email_num = graph_store.store(pst.message_list)
+    print('graph stored ' + str(start_email_num) + ' json messages ')

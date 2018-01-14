@@ -13,7 +13,6 @@ import jinja2
 import unicodecsv as csv
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
-from py._xmlgen import unicode
 
 import EmailProcess
 
@@ -100,6 +99,7 @@ class pst_file(EmailProcess.abstract_email):
         try:
             logging.debug("Starting traverse of PST structure...")
             self.folderTraverse(folder)
+            self.message_list = self.email_filter(self.message_list)
             self.summary()
         except Exception as e:
             logging.error(str(e))
@@ -145,17 +145,25 @@ class pst_file(EmailProcess.abstract_email):
         # print('content type: ' + part.get_content_maintype())
         if 'Content-Type' or 'Content-type' in json_msg:
             try:
-                json_part['contentType'] = json_msg['Content-Type']
+                json_part['contentType'] = str(json_msg['Content-Type'])
             except KeyError as ve:
                 json_part['contentType'] = json_msg['Content-type']
 
-            if json_part['contentType'] == 'text/plain':
-                json_part['content'] = unicode(json_msg['body'])
-            else:
-                if json_part['contentType'] == 'text/html':
-                    json_part['content'] = self.cleanContent(json_msg['body'])
+            if not json_msg['body'] is None:
+                if not json_part['contentType'].find('text/plain') == -1:
+                    json_part['content'] = str(quopri.decodestring(json_msg['body']))  # str(unicode(json_msg['body']))
+                # logging.debug("writing content:" + str(json_part['contentType']) + ":" + json_msg['sender'])
                 else:
-                    json_part['content'] = json_part['contentType'] + ' deleted for mapping json'
+                    if not json_part['contentType'].find('text/html') == -1:
+                        json_part['content'] = self.cleanContent(json_msg['body'])
+                    #  logging.debug("writing content:" + str(json_part['contentType']) + ":" + json_msg['sender'])
+                    else:
+                        try:
+                            json_part['content'] = str(quopri.decodestring(json_msg['body']))
+                        except Exception as decode_exp:
+                            logging.warning("error in decode email msg:" + str(decode_exp))
+            else:
+                json_part['content'] = 'NaN'
 
         json_msg['parts'].append(json_part)
 
@@ -221,12 +229,16 @@ class pst_file(EmailProcess.abstract_email):
         :return: None
         """
         logging.debug("Processing Folder: " + str(folder.name))
-        # message_list = []
+        message_list = []
+        message = None
+        message_dict = None
         for message in folder.sub_messages:
             message_dict = self.processMessage(message)
             if not message_dict == None:
+
                 self.message_list.append(message_dict)
-        self.folderReport(self.message_list, folder.name)
+                message_list.append(message_dict)
+        self.folderReport(message_list, folder.name)
 
     def processMessage(self, message):
         """
@@ -234,8 +246,9 @@ class pst_file(EmailProcess.abstract_email):
         :param message: pypff.Message object
         :return: A dictionary with message fields (values) and their data (keys)
         """
-        message_processed = {}
-        message_processed["Subject"] = message.subject
+        message_processed = {}  # {'subject':None,'sender':None,'header':None,'body':None,'From':None,'To':None, 'Cc':None, 'Bcc':None, 'Return-Path':None, 'Date':None,
+        # 'Message-Id':None, 'Content-type':None,'Content-Transfer-Encoding':None}
+        message_processed["subject"] = message.subject
         message_processed["sender"] = message.sender_name
         message_processed["header"] = message.transport_headers
         if message.transport_headers == None:
@@ -278,12 +291,11 @@ class pst_file(EmailProcess.abstract_email):
         if not len(message_list):
             logging.warning("Empty message not processed")
             return
-
+        message_list = self.email_filter(message_list)
         # CSV Report
         fout_path = self.makePath("folder_report_" + folder_name + ".csv")
         fout = open(fout_path, 'wb')
-        header = ['creation_time', 'submit_time', 'delivery_time',
-                  'sender', 'subject', 'attachment_count']
+        header = ['creation_time', 'submit_time', 'delivery_time', 'sender', 'subject', 'attachment_count']
         csv_fout = csv.DictWriter(fout, fieldnames=header, extrasaction='ignore')
         csv_fout.writeheader()
         csv_fout.writerows(message_list)
@@ -296,8 +308,13 @@ class pst_file(EmailProcess.abstract_email):
         for m in message_list:
             if m['body']:
                 body_out.write(str(m['body']) + "\n\n")
+
             if m['sender']:
                 senders_out.write(m['sender'] + '\n')
+                # if 'Message-Id' in m:
+                #     logging.debug("writing " + str(m['Message-Id'])+":"+m['sender'])
+                # else:
+                #     logging.debug("writing " + str(m['Message-ID']) + ":" + m['sender'])
             # Creation Time
             if m['creation_time'] != None:
                 day_of_week = m['creation_time'].weekday()
@@ -341,7 +358,7 @@ class pst_file(EmailProcess.abstract_email):
             return
 
         fout = open(self.makePath("frequent_words.csv"), 'w')
-        fout.write('Count,Word')
+        fout.write('Count,Word\\n')
         for e in word_list.most_common():
             if (len(e) > 1):
                 fout.write(str(e[1]) + "," + str(e[0]) + "\n")

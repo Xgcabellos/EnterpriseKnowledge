@@ -4,6 +4,7 @@ import email
 import email.utils
 import imaplib
 import quopri
+import re
 import time
 from abc import ABCMeta, abstractmethod
 
@@ -45,6 +46,55 @@ class abstract_email(object):
     def jsonizer_emails(self, msg_list, directory, sufix):
         """"Return a  json string representing the mapping of email this is."""
         raise RuntimeError('jsonizer abstact class')
+
+    @staticmethod
+    def clear_email(sender):
+        """clean email form caracters and text not emailed"""
+        i = 0
+        for n in sender:
+            if n.find('@') == -1:
+                sender[i] = None
+                i = i + 1
+                continue
+            n = str.replace(str(n), '"', ' ')
+            n = str.replace(str(n), '\n', ' ')
+            n = str.replace(str(n), '\t', ' ')
+            index = str.find(n, '<')
+            if index != -1:
+                n = n[index:]
+            nn = n.split()[-1]
+            if nn.find('@') != -1:
+                sender[i] = re.sub(r'[<>]', '', nn.split()[-1])
+
+            else:
+                # print('eliminando: '+sender[i])
+                sender[i] = None
+            i = i + 1
+        return sender
+
+    @staticmethod
+    def email_filter(msg_list):
+        """Rfiltering different kind of message"""
+        for msg in msg_list:
+
+            if 'from' in msg:
+                if msg['from'].find("no-reply") != -1:
+                    msg_list.remove(msg)
+                    continue
+            elif 'From' in msg:
+                if msg['From'].find("no-reply") != -1:
+                    msg_list.remove(msg)
+                    continue
+            else:
+                print('FROM DOEST EXIST')
+                continue
+            if 'Message-Id' in msg:
+                if (msg['Message-Id'] is None):
+                    continue
+            elif 'Message-ID' in msg:
+                if (msg['Message-ID'] is None):
+                    continue
+        return msg_list
 
 
 class gmail(abstract_email):
@@ -132,7 +182,7 @@ class gmail(abstract_email):
                         print(str(read_exp))
                         print(str(read_exp.__class__))
 
-            return msg_list
+            return self.email_filter(msg_list)
         except Exception as e:
             print(str(e))
             print(str(e.__class__))

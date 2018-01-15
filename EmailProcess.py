@@ -1,100 +1,23 @@
 # version v1.0
-
 import email
 import email.utils
 import imaplib
+import logging
 import quopri
-import re
 import time
-from abc import ABCMeta, abstractmethod
 
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
 from py._xmlgen import unicode
 
-import ConnectionProperties
+from AbstractProcess import abstract_email
 
 __author__ = 'Xavier Garcia Cabellos'
 __date__ = '20180101'
 __version__ = 0.01
-__description__ = 'This scripts handles processing and output of different Email Containers'
+__description__ = 'This scripts handles processing and output of gmail Email Containers'
 
 
-class abstract_email(object):
-    """abstact class for reading emails from different services"""
-    conx = ConnectionProperties.connexion_properties
-
-    __metaclass__ = ABCMeta
-
-    def __init__(self, con):
-        self.conx = con
-
-    @abstractmethod
-    def email_type(self):
-        """"Return a string representing the type of connection this is."""
-        raise RuntimeError('email_type abstact class')
-
-    @abstractmethod
-    def read(self, start, stop, folder):
-        """"Return a string representing the type of connection this is."""
-        raise RuntimeError('read_email abstact class')
-
-    def __del__(self):
-        self.conx = None
-
-    @abstractmethod
-    def jsonizer_emails(self, msg_list, directory, sufix):
-        """"Return a  json string representing the mapping of email this is."""
-        raise RuntimeError('jsonizer abstact class')
-
-    @staticmethod
-    def clear_email(sender):
-        """clean email form caracters and text not emailed"""
-        i = 0
-        for n in sender:
-            if n.find('@') == -1:
-                sender[i] = None
-                i = i + 1
-                continue
-            n = str.replace(str(n), '"', ' ')
-            n = str.replace(str(n), '\n', ' ')
-            n = str.replace(str(n), '\t', ' ')
-            index = str.find(n, '<')
-            if index != -1:
-                n = n[index:]
-            nn = n.split()[-1]
-            if nn.find('@') != -1:
-                sender[i] = re.sub(r'[<>]', '', nn.split()[-1])
-
-            else:
-                # print('eliminando: '+sender[i])
-                sender[i] = None
-            i = i + 1
-        return sender
-
-    @staticmethod
-    def email_filter(msg_list):
-        """Rfiltering different kind of message"""
-        for msg in msg_list:
-
-            if 'from' in msg:
-                if msg['from'].find("no-reply") != -1:
-                    msg_list.remove(msg)
-                    continue
-            elif 'From' in msg:
-                if msg['From'].find("no-reply") != -1:
-                    msg_list.remove(msg)
-                    continue
-            else:
-                print('FROM DOEST EXIST')
-                continue
-            if 'Message-Id' in msg:
-                if (msg['Message-Id'] is None):
-                    continue
-            elif 'Message-ID' in msg:
-                if (msg['Message-ID'] is None):
-                    continue
-        return msg_list
 
 
 class gmail(abstract_email):
@@ -108,8 +31,10 @@ class gmail(abstract_email):
 
     def __init__(self, con, email=None):
         """init with connection data and email object inicialided"""
+
         self.conx = con
         self.mail = email
+        # self.active_log(self.conx.FROM_EMAIL,self.level)
         if email == None:
             self.mail = imaplib.IMAP4_SSL(self.conx.SMTP_SERVER)
             self.mail.login(self.conx.FROM_EMAIL, self.conx.FROM_PWD)
@@ -119,7 +44,7 @@ class gmail(abstract_email):
             mail.login(self.conx.FROM_EMAIL, self.conx.FROM_PWD)
             self.connected = True
         status, self.folder_list = self.mail.list()
-        print(self.folder_list)
+        logging.debug(self.folder_list)
         for folder in self.folder_list:
             name_folder = str(folder).split('"')[-2]
 
@@ -129,10 +54,10 @@ class gmail(abstract_email):
                 size_folder = len(data[0].split())
                 self.folder_dict_size[name_folder] = size_folder
                 self.folder_dict_data[name_folder] = data
-                print("Reading (" + str(name_folder) + "):" + str(size_folder) + " email inside")
+                logging.debug("Reading (" + str(name_folder) + "):" + str(size_folder) + " email inside")
             except Exception as read_exp:
-                print("error in reading (" + str(name_folder) + ") for prepare the dict of size and data :" + str(
-                    read_exp))
+                logging.exception("error in reading (" + str(name_folder) + ") for prepare the dict of size and data ")
+
 
     def __del__(self):
         """closing the email connection"""
@@ -142,16 +67,16 @@ class gmail(abstract_email):
             pass
 
     def read(self, start, stop, folder):
+        counter = stop - start
         try:
-            counter = stop - start
+
             msg_list = []
             try:
                 self.mail.select(folder)
             except Exception as read_exp:
-                print(str(read_exp))
-                print("error in mail.select(" + folder + ")")
-                print(str(read_exp.__class__))
+                logging.exception("error in mail.select(" + folder + ")")
                 return msg_list
+
             result, data = self.mail.uid('search', None, "ALL")
             # search and return uids instead
 
@@ -170,34 +95,32 @@ class gmail(abstract_email):
                             try:
                                 response_part_string = response_part[1].decode('utf-8')
                             except Exception as read_exp:
-                                print(str(read_exp))
-                                print('error in response part')
-                                print(str(read_exp.__class__))
+
+                                logging.exception('error in response part')
+
                                 response_part_string = response_part[1].decode('utf-8', errors='ignore')
                             id_message_string = response_part[0].decode('utf-8')
                             msg = email.message_from_string(response_part_string)
                             msg_list.append(msg)
-                            print(id_message_string)
+                            logging.debug(id_message_string)
                     except Exception as read_exp:
-                        print(str(read_exp))
-                        print(str(read_exp.__class__))
+                        logging.exception("Error inside responde_part reading emails in " + folder)
 
             return self.email_filter(msg_list)
         except Exception as e:
-            print(str(e))
-            print(str(e.__class__))
+            logging.exception("Error reading emails in " + folder + " counter " + str(counter))
 
     def read_all(self, size_blocks):
         msg_list = []
         counter = 0
         try:
-            print(self.folder_list)
+            logging.debug(self.folder_list)
 
             for folder in self.folder_list:
                 name_folder = str(folder).split('"')[-2]
                 if (name_folder.upper() != 'INBOX') and (name_folder.upper() != 'ENVIADO'):  ## be careful TEMPORAL
                     continue
-                print(" mail.select(" + name_folder + ")")
+                logging.info(" mail.select(" + name_folder + ")")
                 size = self.folder_dict_size[name_folder]
                 start_email = 0
                 counter = 0
@@ -207,7 +130,7 @@ class gmail(abstract_email):
                     start_email += size_blocks
             return msg_list
         except Exception as e:
-            print(str(e))
+            logging.exception("Global error in read_all " + size_blocks)
 
     def jsonizer_emails(self, msg_list):
         jsonified_messages = [self.jsonifyMessage(m) for m in msg_list]
@@ -261,7 +184,7 @@ class gmail(abstract_email):
                 millis = int(time.mktime(then.timetuple()) * 1000 + then.microsecond / 1000)
                 json_msg['Date'] = {'$date': millis}
         except Exception as e:
-            print("error parsing Date :" + str(json_msg['Date']) + " Error:" + str(e))
+            logging.exception("error parsing Date :" + str(json_msg['Date']))
 
         return json_msg
 
@@ -270,7 +193,7 @@ class gmail(abstract_email):
         try:
             msg = quopri.decodestring(msg)
         except Exception as decode_exp:
-            print("error in decode email msg:" + str(decode_exp))
+            logging.exception("error in decode email")
             # print(msg)
 
         # Strip out HTML tags, if any are present.

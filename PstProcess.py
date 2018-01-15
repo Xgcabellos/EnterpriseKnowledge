@@ -4,7 +4,6 @@ import logging
 import os
 import pypff
 import quopri
-import sys
 import time
 from collections import Counter
 from email.parser import HeaderParser
@@ -15,6 +14,7 @@ from bs4 import BeautifulSoup
 from dateutil.parser import parse
 
 import EmailProcess
+from JsonStorageEmail import json_storage_email
 
 __author__ = 'Xavier Garcia Cabellos'
 __date__ = '20180101'
@@ -37,7 +37,9 @@ class pst_file(EmailProcess.abstract_email):
     status = 0
     message_list = []
     output_directory = ""
-
+    json_directory = ""
+    jsonified_messages = {}
+    json_store = None
     opst = None
     root = None
     report_name = ""
@@ -56,31 +58,34 @@ class pst_file(EmailProcess.abstract_email):
 
         if not os.path.exists(self.output_directory):
             os.makedirs(self.output_directory)
+        # self.active_log('pst_process0r.log',logging.DEBUG,log_directory)
 
-        if log_directory:
-            if not os.path.exists(log_directory):
-                os.makedirs(log_directory)
-            log_path = os.path.join(log_directory, 'pst_indexer.log')
-        else:
-            log_path = 'pst_indexer.log'
-        logging.basicConfig(filename=log_path, level=logging.DEBUG,
-                            format='%(asctime)s | %(levelname)s | %(message)s', filemode='a')
-
-        logging.info('Starting PST_Indexer v.' + str(__version__))
-        logging.debug('System ' + sys.platform)
-        logging.debug('Version ' + sys.version)
-
-        logging.info('Starting Script...')
+        # if log_directory:
+        #     if not os.path.exists(log_directory):
+        #         os.makedirs(log_directory)
+        #     log_path = os.path.join(log_directory, 'pst_indexer.log')
+        # else:
+        #     log_path = 'pst_indexer.log'
+        # logging.basicConfig(filename=log_path, level=logging.DEBUG,
+        #                     format='%(asctime)s | %(levelname)s | %(message)s', filemode='a')
+        #
+        # logging.info('Starting PST_process v.' + str(__version__))
+        # logging.debug('System ' + sys.platform)
+        # logging.debug('Version ' + sys.version)
+        #
+        # logging.info('Starting Script...')
 
         logging.debug("Opening PST for processing...")
         self.pst_name = os.path.split(pst_file)[1]
         self.report_name = report_name
         self.opst = pypff.open(pst_file)
         self.root = self.opst.get_root_folder()
+        self.json_store = json_storage_email(None)
+        self.json_directory = os.path.abspath('./json')
 
     def __del__(self):
         """closing the pts connection"""
-        logging.info('Script Complete')
+        # logging.info('Script Complete')
         pass
 
     def read(self, start, stop, folder):
@@ -117,11 +122,11 @@ class pst_file(EmailProcess.abstract_email):
             logging.error(str(e))
 
     def jsonizer_emails(self, msg_list):
-        jsonified_messages = [self.jsonifyMessage(m) for m in msg_list]
-        content = [p['content'] for m in jsonified_messages for p in m['parts']]
+        self.jsonified_messages = [self.jsonifyMessage(m) for m in msg_list]
+        content = [p['content'] for m in self.jsonified_messages for p in m['parts']]
         # Content can still be quite messy and contain line breaks and other quirks.
 
-        return jsonified_messages
+        return self.jsonified_messages
 
     def jsonifyMessage(self, msg):
         """
@@ -144,10 +149,12 @@ class pst_file(EmailProcess.abstract_email):
 
         # print('content type: ' + part.get_content_maintype())
         if 'Content-Type' or 'Content-type' in json_msg:
+
             try:
-                json_part['contentType'] = str(json_msg['Content-Type'])
+
+                json_part['contentType'] = json_msg['Content-Type']
             except KeyError as ve:
-                json_part['contentType'] = json_msg['Content-type']
+                json_part['contentType'] = str(json_msg['Content-type'])
 
             if not json_msg['body'] is None:
                 if not json_part['contentType'].find('text/plain') == -1:
@@ -174,8 +181,8 @@ class pst_file(EmailProcess.abstract_email):
                 then = parse(json_msg['Date'])
                 millis = int(time.mktime(then.timetuple()) * 1000 + then.microsecond / 1000)
                 json_msg['Date'] = {'$date': millis}
-        except logging.error("error parsing Date :" + json_msg['Date'] + " Error:" + str(e)) as e:
-            logging.error("error parsing Date :" + json_msg['Date'] + " Error:" + str(e))
+        except Exception as e:
+            logging.error("error parsing Date :" + str(json_msg['Date']) + " Error:" + str(e))
 
         for k2 in ['sender', 'header', 'body', 'Content-Type']:
 
@@ -239,6 +246,14 @@ class pst_file(EmailProcess.abstract_email):
                 self.message_list.append(message_dict)
                 message_list.append(message_dict)
         self.folderReport(message_list, folder.name)
+        if len(message_list):
+            jsonified_messages_by_folder = self.jsonizer_emails(message_list)
+            # self.jsonified_messages.append(jsonified_messages_by_folder) # not neccesary because it already be done.
+            logging.debug(
+                'prepared ' + str(len(jsonified_messages_by_folder)) + ' json messages in ' + folder.name + '.json')
+
+            self.json_store.store(jsonified_messages_by_folder, self.json_directory,
+                                  self.pst_name.split('/')[-1] + '_' + folder.name + '.json')
 
     def processMessage(self, message):
         """
@@ -251,6 +266,7 @@ class pst_file(EmailProcess.abstract_email):
         message_processed["subject"] = message.subject
         message_processed["sender"] = message.sender_name
         message_processed["header"] = message.transport_headers
+
         if message.transport_headers == None:
             return None
         message_processed["body"] = message.plain_text_body
@@ -289,7 +305,7 @@ class pst_file(EmailProcess.abstract_email):
         :return: None
         """
         if not len(message_list):
-            logging.warning("Empty message not processed")
+            # logging.debug("Empty message not processed")
             return
         message_list = self.email_filter(message_list)
         # CSV Report

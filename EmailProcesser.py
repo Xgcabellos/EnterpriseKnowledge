@@ -1,14 +1,20 @@
 # version v1.1
+import logging
 
 import ConnectionProperties
 import EmailProcess
 import PstProcess
-from StorageEmail import file_storage_email
-from StorageEmail import neo4j_storage_email
+from JsonStorageEmail import json_storage_email
+from Neo4jStorageEmail import neo4j_storage_email
 
 ORG_EMAIL   = "@gmail.com"
 FROM_EMAIL  = "xgcabellos" + ORG_EMAIL
-FROM_PWD = "xxxxxxxxxxxxxxxxxxxxxxxx"
+FROM_PWD = "XXXXXXXXXXXXXXXXX"
+
+__author__ = 'Xavier Garcia Cabellos'
+__date__ = '20180116'
+__version__ = 0.02
+__description__ = 'This program get emails front different sources and include in Neo4j and json'
 
 
 
@@ -23,12 +29,18 @@ from neo4j.v1 import GraphDatabase
 
 #10.162.41.156 - 192.168.1.105
 driver = GraphDatabase.driver("bolt://192.168.1.105:7687", auth=("neo4j", "Gandalf"))
-# driver = GraphDatabase.driver("bolt://110.162.41.156:7687", auth=("neo4j", "Gandalf"))
-#becareful different depend operating system. it must to be done agnostic.
+# driver = GraphDatabase.driver("bolt://10.162.41.156:7687", auth=("neo4j", "Gandalf"))
+
 directory='./json/'
 gmail = False
 graph_store = neo4j_storage_email(driver)
-json_store = file_storage_email(None)
+graph_store.active_log('EKnowledge.log', logging.INFO)
+logging.info('Starting EKnowledge v.' + str(__version__) + ' (Alpha)')
+logging.info('Coded by ' + str(__author__) + ' at date ' + str(__date__))
+logging.info(str(__description__))
+logging.info('Starting Script...')
+
+json_store = json_storage_email(None)
 if gmail == True:
     properties = ConnectionProperties.google_connexion_properties(ORG_EMAIL, "xgcabellos", FROM_PWD)
     reader = EmailProcess.gmail(properties)
@@ -55,9 +67,5 @@ if gmail == True:
 else:
     pst = PstProcess.pst_file('../input/xavier.pst', './output', 'report.info', log_directory='output')
     pst.read_all()
-    jsonified_messages = pst.jsonizer_emails(pst.message_list)
-    file = pst.pst_name.split('/')[-1] + '.json'
-    print('prepared ' + str(len(jsonified_messages)) + ' json messages in ' + file)
-    json_store.store(jsonified_messages, directory, file)
     start_email_num = graph_store.store(pst.message_list)
-    print('graph stored ' + str(start_email_num) + ' json messages ')
+    logging.info('graph stored ' + str(start_email_num) + ' json messages ')

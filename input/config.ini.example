@@ -1,0 +1,57 @@
+; config.ini
+#info and level of logs 
+[LOGS]
+LOG_FILE = EKnowledge.log
+LOG_DIRECTORY = ./logs/
+
+#Log level
+log_level = INFO
+log_level_email = INFO
+log_level_text = INFO
+log_level_json = INFO
+log_level_graph = INFO
+log_level_analytic_graph = INFO
+
+#API's log
+log_level_neo4j = INFO 
+
+
+[INPUT]
+#csv of users using IMAP without SSL
+USERS_FILE = ./input/users.csv
+
+#csv of users using IMAP with SSL
+USERSSSL_FILE = ./input/users.gmail.csv
+
+TYPE_OF_EMAIL= IMAP_SSL 
+# IMAP_SSL or IMAP or PST
+
+[OUTPUT]
+JSON_STORE_TYPE= file
+# file or mongoDB
+DIRECTORY_JSON= ./json/
+DIRECTORY_OUTPUT =./output/
+
+
+[CONNECTION]
+#email ip for IMAP not SSL
+EMAIL_SERVER = 192.168.1.108
+
+# Neo4j Graph DDBB
+GRAPHDDBB_SERVER = localhost
+GRAPHDDBB_LOGIN= neo4j
+GRAPHDDBB_PASSWORD= ********
+GRAPHDDBB_DATABASE= neo4j
+
+#Mongo Documental DDBB  
+MONGODB_SERVER= localhost
+MONGODB_LOGIN= admin
+MONGODB_PASSWORD= *********
+MONGODB_DATABASE= admin
+
+[PROCESS]
+MAX_NUMBER_OR_CONNEXIONS = 5
+NUMBER_OF_MESSAGES_BY_CYCLE = 100
+
+[FILTERS]
+EMAIL_HEADER_FIELDS_NOT_STORED = X-,DKIM-Signature,Microsoft.Exchange.RMSApaAgent.ProtectionTemplateId

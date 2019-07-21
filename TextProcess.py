@@ -5,13 +5,13 @@ import os
 import re
 from logging import Logger
 
-import contractions as contractions
+import contractions
 import inflect as inflect
 import nltk
 import unicodedata
 from bs4 import BeautifulSoup
 from bs4 import Comment
-from email_reply_parser import EmailReplyParser
+# from email_reply_parser import EmailReplyParser
 from htmllaundry import sanitize
 from nltk.corpus import stopwords
 
@@ -234,13 +234,13 @@ class text_process:
             self.fragments.append(self.fragment)
         self.fragment = None
 
-    @staticmethod
-    def parse_email(email_message):
-        return EmailReplyParser.read(email_message)
-
-    @staticmethod
-    def parse_reply(email_message):
-        return EmailReplyParser.parse_reply(email_message)
+    # @staticmethod
+    # def parse_email(email_message):
+    #     return EmailReplyParser.read(email_message)
+    #
+    # @staticmethod
+    # def parse_reply(email_message):
+    #     return EmailReplyParser.parse_reply(email_message)
 
     # def processor(self, text):
     #

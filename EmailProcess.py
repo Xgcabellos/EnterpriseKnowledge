@@ -16,7 +16,8 @@ from sys import *
 
 import unicodecsv as csv
 from bs4 import BeautifulSoup
-from bson import json_util
+from bson.json_util import dumps
+# from bson import json_util
 from dateutil.parser import parse
 from jinja2 import Template
 from psutil._compat import xrange
@@ -50,6 +51,7 @@ date_dict = {x: 0 for x in xrange(1, 25)}
 date_list = [ date_dict.copy() for x in xrange(7) ]
 
 FORBIDDEN_TAGS = config[ 'FILTERS' ][ 'EMAIL_HEADER_FIELDS_NOT_STORED' ]
+
 
 class gmail(abstract_email):
     """ Class for read email from google Mapi"""

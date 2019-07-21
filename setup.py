@@ -8,5 +8,6 @@ setup(
     license='Copyright Xavier Garcia Cabellos & Alvaro Roman',
     author='xgarcia',
     author_email='xgcabellos@gmail.com',
-    description='Email interpreter as internal relationship of the company '
+    description='Email interpreter as internal relationship of the company ', install_requires=['psutil', 'inflect',
+                                                                                                'nltk', 'neo4j']
 )

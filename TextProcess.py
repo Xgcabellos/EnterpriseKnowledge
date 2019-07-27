@@ -3,12 +3,12 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from logging import Logger
 
 import contractions
 import inflect as inflect
 import nltk
-import unicodedata
 from bs4 import BeautifulSoup
 from bs4 import Comment
 # from email_reply_parser import EmailReplyParser
@@ -424,31 +424,31 @@ class Paragraph(object):
 
 
 def main():
-    sample = """<h1>Title Goes Here</h1>
-        <b>Bolded Text</b>
-        <i>Italicized Text</i>
-        <img src="this should all be gone"/>
-        <a href="this will be gone, too">But this will still be here!</a>
-        I run. He ran. She is running. Will they stop running?
-        I talked. She was talking. They talked to them about running. Who ran to the talking runner?
-        [Some text we don't want to keep is in here]
-        ¡Sebastián, Nicolás, Alejandro and Jéronimo are going to the store tomorrow morning!
-        something... is! wrong() with.,; this :: sentence.
-        I can't do this anymore. I didn't know them. Why couldn't you have dinner at the restaurant?
-        My favorite movie franchises, in order: Indiana Jones; Marvel Cinematic Universe; Star Wars; Back to the Future; Harry Potter.
-        Don't do it.... Just don't. Billy! I know what you're doing. This is a great little house you've got here.
-        [This is some other unwanted text]
-        John: "Well, well, well."
-        James: "There, there. There, there."
-        &nbsp;&nbsp;
-        There are a lot of reasons not to do this. There are 101 reasons not to do it. 1000000 reasons, actually.
-        I have to go get 2 tutus from 2 different stores, too.
-        22    45   1067   445
-        {{Here is some stuff inside of double curly braces.}}
-        {Here is more stuff in single curly braces.}
-        [DELETE]
-        </body>
-        </html>"""
+    # sample = """<h1>Title Goes Here</h1>
+    #     <b>Bolded Text</b>
+    #     <i>Italicized Text</i>
+    #     <img src="this should all be gone"/>
+    #     <a href="this will be gone, too">But this will still be here!</a>
+    #     I run. He ran. She is running. Will they stop running?
+    #     I talked. She was talking. They talked to them about running. Who ran to the talking runner?
+    #     [Some text we don't want to keep is in here]
+    #     ¡Sebastián, Nicolás, Alejandro and Jéronimo are going to the store tomorrow morning!
+    #     something... is! wrong() with.,; this :: sentence.
+    #     I can't do this anymore. I didn't know them. Why couldn't you have dinner at the restaurant?
+    #     My favorite movie franchises, in order: Indiana Jones; Marvel Cinematic Universe; Star Wars; Back to the Future; Harry Potter.
+    #     Don't do it.... Just don't. Billy! I know what you're doing. This is a great little house you've got here.
+    #     [This is some other unwanted text]
+    #     John: "Well, well, well."
+    #     James: "There, there. There, there."
+    #     &nbsp;&nbsp;
+    #     There are a lot of reasons not to do this. There are 101 reasons not to do it. 1000000 reasons, actually.
+    #     I have to go get 2 tutus from 2 different stores, too.
+    #     22    45   1067   445
+    #     {{Here is some stuff inside of double curly braces.}}
+    #     {Here is more stuff in single curly braces.}
+    #     [DELETE]
+    #     </body>
+    #     </html>"""
 
     #  sample = text_process.denoise_text(sample)
     #  print(sample)
@@ -462,8 +462,9 @@ def main():
     #  print(words)
 
     json_directory = './json/'
+    json_file = 'xgarcia.tuitravel-ad.net.200.INBOX.json'
 
-    with open(json_directory + 'xgarcia.tuitravel-ad.net.200.INBOX.json', 'r') as f:
+    with open(json_directory + json_file, 'r') as f:
         data = json.load(f)
     json_list = [ ]
 
@@ -472,45 +473,219 @@ def main():
         print("#################################################")
         proc.clean_json_message(doc)
 
+    print('-------------------------------------------------------------------------------------------')
+    number_of_seen = 0
+    for p in proc.fragments:
+        # print('-------------------------------------------------------------------------------------------')
+        if not p.hidden:
+            print(p.content)
+            # print(doc[ 'parts' ][0][ 'contentType' ])
+            number_of_seen += 1
+        # else:
+        #   print('hidden------------------------------------------------------------------------')
+    print('-------------------------------------------------------------------------------------------')
+    if number_of_seen == 0:
+        print(doc['parts'][0]['content'])
         print('-------------------------------------------------------------------------------------------')
-        number_of_seen = 0
-        for p in proc.fragments:
-            # print('-------------------------------------------------------------------------------------------')
-            if not p.hidden:
-                print(p.content)
-                # print(doc[ 'parts' ][0][ 'contentType' ])
-                number_of_seen += 1
-            # else:
-            #   print('hidden------------------------------------------------------------------------')
-        print('-------------------------------------------------------------------------------------------')
-        if number_of_seen == 0:
-            print(doc[ 'parts' ][ 0 ][ 'content' ])
-            print('-------------------------------------------------------------------------------------------')
-        proc = None
 
-    #     for message in doc['parts']:
-    #         if message['contentType']=='text/html':
-    #             message['content']=text_process.clean_html(message['content'])
-    #     data_json = loads(json.dumps(doc))
-    #     try:
-    #         html=data_json['parts'][0]['content']
-    #         print("#################################################")
-    #         # print(html)
-    #         # print('-------------------------------------------------')
-    #         # print(EbookProcess.extract_content_with_arc90(html))
-    #         # print('--------------------------------------------------')
-    #         # print(text_process.strip_html(html))
-    #         # print('-------------------------------------------------')
-    #         html_ok=sanitize(html)
-    #         #print(html_ok)
-    #         #print('-------------------------------------------------')
-    #         soup = BeautifulSoup(html_ok, 'lxml')
-    #         page = soup.find_all(text_process.VALID_TAGS)
-    #         for p in page:
-    #             print(p.getText())
-    #             print('-------------------------------------------------')
-    #     except Exception as err:
-    #         print(err)
+    #
+    # import re
+    # import pandas as pd
+    # import numpy as np
+    # from collections import defaultdict
+    # import requests
+    # # Set Pandas to display all rows of dataframes
+    # pd.set_option('display.max_rows', 500)
+    #
+    # # nltk
+    # from nltk import tokenize
+    #
+    # from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+    #
+    # # Plotting tools
+    # import matplotlib.pyplot as plt
+    # import matplotlib
+    # plt.style.use('fivethirtyeight')
+    # #%matplotlib  inline
+    #
+    # import warnings
+    # warnings.filterwarnings("ignore", category=DeprecationWarning)
+    #
+    # from tqdm import tqdm_notebook as tqdm
+    # from tqdm import trange
+    #
+    #
+    # hp = defaultdict(dict)
+    #
+    # hp[json_file]['Chapter ']  = (chap_title, chap_text)
+    # hp = dict(hp)
+    # hp["Harry Potter and the Deathly Hallows"]['Epilogue'] = hp["Harry Potter and the Deathly Hallows"].pop(
+    #     'Chapter 37')
+    #
+    # analyzer = SentimentIntensityAnalyzer()
+    #
+    # for book in tqdm(hp, desc='Progress'):
+    #     print(book)
+    #     for chapter in tqdm(hp[book], postfix=book):
+    #         #         print('  ', hp[book][chapter][0])
+    #         text = hp[book][chapter][1].replace('\n', '')
+    #         sentence_list = tokenize.sent_tokenize(text)
+    #         sentiments = {'compound': 0.0, 'neg': 0.0, 'neu': 0.0, 'pos': 0.0}
+    #
+    #         for sentence in sentence_list:
+    #             vs = analyzer.polarity_scores(sentence)
+    #             sentiments['compound'] += vs['compound']
+    #             sentiments['neg'] += vs['neg']
+    #             sentiments['neu'] += vs['neu']
+    #             sentiments['pos'] += vs['pos']
+    #
+    #         sentiments['compound'] = sentiments['compound'] / len(sentence_list)
+    #         sentiments['neg'] = sentiments['neg'] / len(sentence_list)
+    #         sentiments['neu'] = sentiments['neu'] / len(sentence_list)
+    #         sentiments['pos'] = sentiments['pos'] / len(sentence_list)
+    #
+    #         hp[book][chapter] = (hp[book][chapter][0], hp[book][chapter][1], sentiments)
+    #
+    #         compound_sentiments = [hp[book][chapter][2]['compound'] for book in hp for chapter in hp[book]]
+    #         chap = 0
+    #         for book in hp:
+    #             print(book)
+    #             book_chap = 1
+    #             for chapter in hp[book]:
+    #                 print('  Chapter', book_chap, '-', hp[book][chapter][0])
+    #                 print('     ', compound_sentiments[chap])
+    #                 book_chap += 1
+    #                 chap += 1
+    #             print()
+    #
+    #
+    #
+    #         book_indices = {}
+    #         idx = 0
+    #         for book in hp:
+    #             start = idx
+    #             for chapter in hp[book]:
+    #                 idx += 1
+    #             book_indices[book] = (start, idx)
+    #
+    #         def movingaverage(interval, window_size):
+    #             window = np.ones(int(window_size)) / float(window_size)
+    #             return np.convolve(interval, window, 'same')
+    #
+    #         length = sum([len(hp[book]) for book in hp])
+    #         x = np.linspace(0, length - 1, num=length)
+    #         y = [hp[book][chapter][2]['compound'] for book in hp for chapter in hp[book]]
+    #
+    #         plt.figure(figsize=(15, 10))
+    #         for book in book_indices:
+    #             plt.plot(x[book_indices[book][0]: book_indices[book][1]],
+    #                      y[book_indices[book][0]: book_indices[book][1]],
+    #                      label=book)
+    #         plt.plot(movingaverage(y, 10), color='k', linewidth=3, linestyle=':', label='Moving Average')
+    #         plt.axhline(y=0, xmin=0, xmax=length, alpha=.25, color='r', linestyle='--', linewidth=3)
+    #         plt.legend(loc='best', fontsize=15)
+    #         plt.title('Emotional Sentiment of the Harry Potter series', fontsize=20)
+    #         plt.xlabel('Chapter', fontsize=15)
+    #         plt.ylabel('Average Sentiment', fontsize=15)
+    #         plt.show()
+    #
+    #         length = sum([len(hp[book]) for book in hp])
+    #         x = np.linspace(0, length - 1, num=length)
+    #         y = [hp[book][chapter][2]['compound'] for book in hp for chapter in hp[book]]
+    #
+    #         plt.figure(figsize=(15, 10))
+    #         for book in book_indices:
+    #             plt.plot(x[book_indices[book][0]: book_indices[book][1]],
+    #                      y[book_indices[book][0]: book_indices[book][1]],
+    #                      label=book)
+    #         plt.plot(movingaverage(y, 10), color='k', linewidth=3, linestyle=':', label='Moving Average')
+    #         plt.axhline(y=0, xmin=0, xmax=length, alpha=.25, color='r', linestyle='--', linewidth=3)
+    #         plt.xticks(np.arange(0, 225, 25), '')
+    #         plt.yticks(np.arange(-.15, .15, .05), '')
+    #         plt.show()
+    #
+    #         sentiment_scores = [[hp[book][chapter][2][sentiment] for book in hp for chapter in hp[book]]
+    #                             for sentiment in ['compound', 'neg', 'neu', 'pos']]
+    #
+    #         compound_sentiment = sentiment_scores[0]
+    #
+    #         print('Average Book Sentiment:')
+    #         print()
+    #         for book in book_indices:
+    #             compound = compound_sentiment[book_indices[book][0]: book_indices[book][1]]
+    #             print('{:45}{:.2f}%'.format(book, 100 * sum(compound) / len(compound)))
+    #         print('{:45}{:.2f}%'.format('Across the entire series',
+    #                                     100 * sum(compound_sentiment) / len(compound_sentiment)))
+    #
+    #         length = sum([len(hp[book]) for book in hp])
+    #         x = np.linspace(0, length - 1, num=length)
+    #
+    #         plt.figure(figsize=(15, 10))
+    #         for i, sentiment in enumerate(sentiment_scores):
+    #             plt.plot(x,
+    #                      sentiment,
+    #                      label=['compound', 'neg', 'neu', 'pos'][i])
+    #         # plt.plot(movingaverage(compound_sentiments, 10)+.1, color='k', linewidth=3, linestyle=':', label = 'Moving Average')
+    #         plt.axhline(y=0, xmin=0, xmax=length, alpha=.25, color='r', linestyle='--', linewidth=3)
+    #         plt.legend(loc='best', fontsize=15)
+    #         plt.title('Chapter Sentiment of the Harry Potter series', fontsize=20)
+    #         plt.xlabel('Chapter', fontsize=15)
+    #         plt.ylabel('Average Sentiment', fontsize=15)
+    #         plt.show()
+    #
+    #         pattern = ("(C H A P T E R (?:[A-Z-][ ]){2,}[A-Z]|"
+    #                    "E P I L O G U E)\s+" +  # Group 1 selects the chapter number
+    #                    "([A-Z \n',.-]+)\\b(?![A-Z]+(?=\.)\\b)" +  # Group 2 selects the chapter title but excludes all caps word beginning first sentence of the chapter
+    #                    "(?![a-z']|[A-Z.])" +  # chapter title ends before lowercase letters or a period
+    #                    "(.*?)" +  # Group 3 selects the chapter contents
+    #                    "(?=C H A P T E R (?:[A-Z][ ]){2,}|"
+    #                    "This\s+book\s+was\s+art\s+directed\s+|"
+    #                    "E P I L O G U E)")  # chapter contents ends with a new chapter, epilogue or the end of book
+    #         hp2 = defaultdict(dict)
+    #         for book in books:
+    #             title = book[28:-4]
+    #             with open(book, 'r') as f:
+    #                 text = (f.read().replace('&rsquo;', "'")
+    #                         .replace('&lsquo;', "'")
+    #                         .replace('&rdquo;', '"')
+    #                         .replace('&ldquo;', '"')
+    #                         .replace('&mdash;', '—'))
+    #             chapters = re.findall(pattern, text, re.DOTALL)
+    #             chap = 0
+    #             for chapter in chapters:
+    #                 chap += 1
+    #                 chap_title = chapter[1].replace('\n', '')
+    #                 chap_text = chapter[2][3:]
+    #                 phrase = ' HE-WHO-MUST-NOT-BE-NAMED RETURNS'
+    #                 if phrase in chap_title:
+    #                     chap_title = chap_title.replace(phrase, '')
+    #                     chap_text = phrase[1:] + ' I' + chap_text
+    #                 chap_text = re.sub('\n*&bull; [0-9]+ &bull; \n*' + chap_title + ' \n*', '', chap_text,
+    #                                    flags=re.IGNORECASE)
+    #                 chap_text = re.sub('\n*&bull; [0-9]+ &bull;\s*(CHAPTER [A-Z-]+\s*)|(EPILOGUE)\s*', '', chap_text)
+    #                 chap_text = re.sub(' \n&bull; [0-9]+ &bull; \n*', '', chap_text)
+    #                 chap_text = re.sub('\s*'.join([word for word in chap_title.split()]), '', chap_text)
+    #                 hp2[title]['Chapter ' + str(chap)] = (chap_title, chap_text)
+    #         hp2 = dict(hp2)
+    #         hp2["Harry Potter and the Deathly Hallows"]['Epilogue'] = hp2["Harry Potter and the Deathly Hallows"].pop('Chapter 37')
+    #
+    #         for book in tqdm(hp2, desc='Progress'):
+    #             print(book)
+    #             for chapter in tqdm(hp2[book]):
+    #                 #         print('  ', hp2[book][chapter][0])
+    #                 text = hp2[book][chapter][1].replace('\n', '')
+    #                 sentence_list = tokenize.sent_tokenize(text)
+    #                 sentiments2 = {'compound': [], 'neg': [], 'neu': [], 'pos': []}
+    #
+    #                 vs = analyzer.polarity_scores(text)
+    #                 sentiments2['compound'] = vs['compound']
+    #                 sentiments2['neg'] = vs['neg']
+    #                 sentiments2['neu'] = vs['neu']
+    #                 sentiments2['pos'] = vs['pos']
+    #
+    #                 hp2[book][chapter] = (hp2[book][chapter][0], hp2[book][chapter][1], sentiments2)
+    #         #     print()
+
 
 
 if __name__ == '__main__':

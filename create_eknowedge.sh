@@ -43,3 +43,15 @@ cd libpff/
 ./autogen.sh
 ./configure --prefix /usr/ --with-python --with-python3
 sudo make install
+
+
+sudo su
+wget --no-check-certificate -O - https://debian.neo4j.org/neotechnology.gpg.key | sudo apt-key add -
+echo 'deb http://debian.neo4j.org/repo stable/' > /etc/apt/sources.list.d/neo4j.list
+apt update
+apt install neo4j
+cd /var/lib/neo4j/plugins
+wget https://github.com/neo4j-contrib/neo4j-graph-algorithms/releases/download/3.5.4.0/graph-algorithms-algo-3.5.4.0.jar
+sudo nano /etc/neo4j/neo4j.conf
+# add dbms.security.procedures.unrestricted=algo.*,apoc.*
+#dbms.security.auth_enabled=false

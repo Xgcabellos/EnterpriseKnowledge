@@ -1,3 +1,3 @@
 # EnterpriseKnowledge
 Internal Enterprise Knowledge
-by Alvaro Roman an Xavier Garcia 
+by Alvaro Roman and Xavier Garcia Cabellos

@@ -7,16 +7,15 @@ from collections import Counter
 from email import message_from_string, policy
 from imaplib import IMAP4
 from imaplib import IMAP4_SSL
-from json import dumps
 from logging import *
 # from os.path import exists,join
 from quopri import *
 from re import sub
 from sys import *
 
+import bson.json_util
 import unicodecsv as csv
 from bs4 import BeautifulSoup
-from bson.json_util import dumps
 # from bson import json_util
 from dateutil.parser import parse
 from jinja2 import Template
@@ -349,7 +348,7 @@ class gmail(abstract_email):
                     then = parse(date)
                     # millis = int(time.mktime(then.timetuple()) * 1000 + then.microsecond / 1000)
                     # json_msg[ 'Date' ] = {'$date': millis}
-                    json_msg[ 'Date' ] = dumps(then, default=json_util.default)
+                    json_msg['Date'] = bson.json_util.dumps(then, default=bson.json_util.default)
 
 
         except Exception as e:

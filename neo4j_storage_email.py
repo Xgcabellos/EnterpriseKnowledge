@@ -6,9 +6,9 @@ import neotime
 from dateutil.parser import parse
 from neo4j.v1 import GraphDatabase
 
-from EmailProcess import clean_id
-from StorageEmail import storage_email
-from TextProcess import log_level_conversor
+from email_process import clean_id
+from storage_email import StorageEmail
+from text_process import log_level_conversor
 
 _author__ = 'Xavier Garcia Cabellos'
 __date__ = '20180101'
@@ -20,19 +20,21 @@ config_name = '../input/config.ini'
 config = configparser.ConfigParser()
 config.read(config_name)
 
-log_name = config[ 'LOGS' ][ 'LOG_FILE' ]
-log_directory = config[ 'LOGS' ][ 'LOG_DIRECTORY' ]
-log_level = log_level_conversor(config[ 'LOGS' ][ 'log_level_graph' ])
+log_name = config['LOGS']['LOG_FILE']
+log_directory = config['LOGS']['LOG_DIRECTORY']
+log_level = log_level_conversor(config['LOGS']['log_level_graph'])
 
 module_logger = getLogger('Neo4jStorageEmail')
+
+
 # driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "Gandalf"))
 
-class neo4j_storage_email(storage_email):
-    def __init__(self,driver,log_file,log_level,log_directory):
+class neo4J_storageEmail(StorageEmail):
+    def __init__(self, driver, log_file, log_level, log_directory):
         self.driver = driver
         log = getLogger("neo4j.bolt")
-        log.setLevel(log_level_conversor(config[ 'LOGS' ][ 'log_level_neo4j' ]))
-        self.logger =self.active_log(log_file,log_level, log_directory)
+        log.setLevel(log_level_conversor(config['LOGS']['log_level_neo4j']))
+        self.logger = self.active_log(log_file, log_level, log_directory)
 
     def storage_type(self):
         """"Return a string representing the type of connection this is."""
@@ -243,7 +245,7 @@ class neo4j_storage_email(storage_email):
                 email_date = None
 
                 if 'from' in msg:
-                    sender = self.clear_email(msg[ 'From' ].split(','))  # msg['from'].split(',')
+                    sender = self.clear_email(msg['From'].split(','))  # msg['from'].split(',')
                 elif 'From' in msg:
                     sender = self.clear_email(msg['From'].split(','))  # msg['from'].split(',')
                 else:
@@ -276,48 +278,47 @@ class neo4j_storage_email(storage_email):
                         self.logger.debug('Message-Id DOESNT EXIST')
                         return
                     else:
-                        email_id = clean_id(msg[ 'Message-Id' ])
+                        email_id = clean_id(msg['Message-Id'])
                 elif 'Message-ID' in msg:
                     if (msg['Message-ID'] is None):
                         self.logger.debug('Message-ID DOESNT EXIST')
                         return
                     else:
-                        email_id = clean_id(msg[ 'Message-ID' ])
+                        email_id = clean_id(msg['Message-ID'])
 
                 if 'CC' in msg:
-                    email_cc = self.clear_email(msg[ 'Cc' ].split(','))
+                    email_cc = self.clear_email(msg['Cc'].split(','))
                 elif 'Cc' in msg:
                     email_cc = self.clear_email(msg['Cc'].split(','))
                 if 'Bcc' in msg:
                     email_bcc = self.clear_email(msg['Bcc'].split(','))
                 if 'Thread-Topic' in msg:
-                    if msg[ 'Thread-Topic' ] is None:
+                    if msg['Thread-Topic'] is None:
                         self.logger.debug('Thread-Topic DOESNT EXIST')
                     else:
-                        thread_topic = msg[ 'Thread-Topic' ]
+                        thread_topic = msg['Thread-Topic']
                 if 'Thread-Index' in msg:
-                    if msg[ 'Thread-Index' ] is None:
+                    if msg['Thread-Index'] is None:
                         self.logger.debug('Thread-Index DOESNT EXIST')
                     else:
-                        thread_index = clean_id(msg[ 'Thread-Index' ])
+                        thread_index = clean_id(msg['Thread-Index'])
                 if 'In-Reply-To' in msg:
-                    if msg[ 'In-Reply-To' ] is None:
+                    if msg['In-Reply-To'] is None:
                         self.logger.debug('In-Reply-to DOESNT EXIST')
                     else:
-                        in_reply_to = clean_id(msg[ 'In-Reply-To' ])
+                        in_reply_to = clean_id(msg['In-Reply-To'])
                 if 'References' in msg:
-                    if msg[ 'References' ] is None:
+                    if msg['References'] is None:
                         self.logger.debug('References DOESNT EXIST')
                     else:
-                        references = msg[ 'References' ].replace('\n', '').replace('\t', '') \
+                        references = msg['References'].replace('\n', '').replace('\t', '') \
                             .replace('\r', '').replace(' ', ',').split(',')
                         references_cleaned = list(map(clean_id, references))
                 if 'Date' in msg:
-                    if msg[ 'Date' ] is None:
+                    if msg['Date'] is None:
                         self.logger.debug('Date DOESNT EXIST')
                     else:
-                        email_date = neotime.DateTime.from_native(parse(msg[ 'Date' ]))
-
+                        email_date = neotime.DateTime.from_native(parse(msg['Date']))
 
                 with self.driver.session() as session:
                     session.write_transaction(self.define_emailUser_constraint)

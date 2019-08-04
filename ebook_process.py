@@ -14,23 +14,24 @@ from ebooklib.epub import EpubBook
 _author__ = 'Xavier Garcia Cabellos'
 __date__ = '20180101'
 __version__ = 0.01
-__description__ = 'This scripts read ebook and break it in different elements'
+__description__ = 'This scripts read EbookProcess and break it in different elements'
 
 #######
 # Notas: # html2text.html2text(html) para pasar de html a text
-books_file = '../input/books/Free_as_in_freedom.epub' # for testing
+books_file = '../input/books/Free_as_in_freedom.epub'  # for testing
 module_logger = logging.getLogger('ebookprocess')
 log_level = logging.INFO
 
 
 # noinspection PyCompatibility
-class ebook:
-    items = [ ]
+class EbookProcess:
+    items = []
     # noinspection PyCompatibility
     book: EpubBook = None
     title = ""
     index = ""
-    level=log_level
+    level = log_level
+
     def __init__(self, books_file=books_file, log_directory="./logs/", exception=Exception):
         """
                    The main function opens a PST and calls functions to parse and report data from the PST
@@ -39,15 +40,15 @@ class ebook:
                    :param log_directory: A string representing the path to the log file
                    :return: None
                    """
-        self.active_log('Sending_Emails.log',self.level,log_directory)
-        self.logger.debug('System ' + sys.platform +'  Version ' + sys.version)
+        self.active_log('Sending_Emails.log', self.level, log_directory)
+        self.logger.debug('System ' + sys.platform + '  Version ' + sys.version)
         self._content = None
-        self._paragraphs = [ ]
-        self.header = [ ]
-        count=0
+        self._paragraphs = []
+        self.header = []
+        count = 0
         try:
             self.book = epub.read_epub(books_file)
-            self.title = self.book.title #self.book.get_metadata('DC', 'title')
+            self.title = self.book.title  # self.book.get_metadata('DC', 'title')
             self.index = self.book.get_item_with_href('index.xhtml')
             self.logger.info('reading epub....' + str(self.title) + "  from " + books_file)
             for item in self.book.get_items():
@@ -58,14 +59,15 @@ class ebook:
                     for paragraph in extract_content_with_arc90(item.get_content().decode('utf-8', 'ignore')):
                         self._paragraphs.append(paragraph)
                     # self.logger.debug(preprocess_paragraph(str(paragraph)))
-                    count+=1
-                    if count==4:#ojo!!!!!!!!!!!!!!!! quitar el break es solo para ejecutar esto rapido
-                        return #ojo!!!!!!!!!!!!!!!! quitar el break es solo para ejecutar esto rapido
+                    count += 1
+                    if count == 4:  # ojo!!!!!!!!!!!!!!!! quitar el break es solo para ejecutar esto rapido
+                        return  # ojo!!!!!!!!!!!!!!!! quitar el break es solo para ejecutar esto rapido
 
 
         except exception as BookException:
             self.logger.exception("Error: problems reading the book")
-       # self.logger.debug('Finish of Read ' + str(count) + ' messages')
+
+    # self.logger.debug('Finish of Read ' + str(count) + ' messages')
 
     def __del__(self):
         """
@@ -137,16 +139,16 @@ class ebook:
         """
         count = 0
         soup = BeautifulSoup()
-        mem_attr = [ 'Description', 'PhysicalID', 'Slot', 'Size', 'Width' ]
+        mem_attr = ['Description', 'PhysicalID', 'Slot', 'Size', 'Width']
         html = Tag(builder=soup.builder, name='html')
-       # paragraph = Tag(builder=soup.builder, name='p')
+        # paragraph = Tag(builder=soup.builder, name='p')
         head = Tag(builder=soup.builder, name='head')
         titl = Tag(builder=soup.builder, name='title')
         body = Tag(builder=soup.builder, name='body')
         if (header is not None and len(header) != 0):
             head.insert(0, NavigableString(header))
         if (title is not None and len(title) != 0):
-            titl.insert(0, NavigableString(str(title[ 0 ])))
+            titl.insert(0, NavigableString(str(title[0])))
         soup.append(html)
         html.append(head)
         head.append(titl)
@@ -165,18 +167,18 @@ class ebook:
         """
         Method for make several html doc with the paragraphs of the book
         :param number: Number of paragraphs in each doc
-        :param header: header of the ebook
+        :param header: header of the EbookProcess
         :param paragraphs: Paragraphs of the book
         :return: list of html document
         """
-        htmls: List[ object ] = [ ]
+        htmls: List[object] = []
         count = 1
         each = number
-        subparagraph = [ ]
+        subparagraph = []
         for paragraph in self.paragraphs:
             subparagraph.append(paragraph)
             if (count % each) == 0:
-                htmls.append(self.create_html(self.title,self.header, subparagraph))
+                htmls.append(self.create_html(self.title, self.header, subparagraph))
                 subparagraph.clear()
             count = count + 1
         return htmls
@@ -193,8 +195,9 @@ class ebook:
         logging.basicConfig(filename=log_path, level=level,
                             format='%(asctime)s | %(levelname)s | %(name)s | %(message)s', filemode='a')
 
-        self.logger = logging.getLogger("ebookprocess.ebook")
-        self.logger.debug('Starting ebook_process logger using v.' + str(__version__)+ ' System ' + sys.platform +' Version ' + sys.version )
+        self.logger = logging.getLogger("ebookprocess.EbookProcess")
+        self.logger.debug('Starting ebook_process logger using v.' + str(
+            __version__) + ' System ' + sys.platform + ' Version ' + sys.version)
 
 
 NEGATIVE = re.compile(".*comment.*|.*meta.*|.*footer.*|.*foot.*|.*cloud.*|.*head.*")
@@ -211,6 +214,7 @@ def preprocess_paragraph(text):
     text.replace('[^\s]', '')
     return text
 
+
 def extract_content_with_arc90(html):
     """
 
@@ -221,7 +225,7 @@ def extract_content_with_arc90(html):
     soup = simplify_html_before(soup)
 
     topParent = None
-    parents = [ ]
+    parents = []
     for paragraph in soup.findAll("p"):
 
         parent = paragraph.parent
@@ -231,15 +235,15 @@ def extract_content_with_arc90(html):
                 parent.score = 0
 
                 if (parent.has_key("class")):
-                    if (NEGATIVE.match(str(parent[ "class" ]))):
+                    if (NEGATIVE.match(str(parent["class"]))):
                         parent.score -= 50
-                    elif (POSITIVE.match(str(parent[ "class" ]))):
+                    elif (POSITIVE.match(str(parent["class"]))):
                         parent.score += 25
 
                 if (parent.has_key("id")):
-                    if (NEGATIVE.match(str(parent[ "id" ]))):
+                    if (NEGATIVE.match(str(parent["id"]))):
                         parent.score -= 50
-                    elif (POSITIVE.match(str(parent[ "id" ]))):
+                    elif (POSITIVE.match(str(parent["id"]))):
                         parent.score += 25
 
             if (len(paragraph.renderContents()) > 10):
@@ -253,6 +257,7 @@ def extract_content_with_arc90(html):
         soup = simplify_html_after(topParent)
     return soup.findAll("p")
 
+
 def simplify_html_after(soup):
     """
 
@@ -265,6 +270,7 @@ def simplify_html_after(soup):
             element.extract()
     return soup
 
+
 def simplify_html_before(soup):
     """
 
@@ -272,7 +278,7 @@ def simplify_html_before(soup):
     :return:
     """
     comments = soup.findAll(text=lambda text: isinstance(text, Comment))
-    [ comment.extract() for comment in comments ]
+    [comment.extract() for comment in comments]
 
     # you can add more rules here!
 
@@ -301,6 +307,7 @@ def simplify_html_before(soup):
 
     return soup
 
+
 def delete_if_no_text(soup, tag):
     """
 
@@ -312,6 +319,7 @@ def delete_if_no_text(soup, tag):
         if (len(p.renderContents().strip()) == 0):
             p.extract()
     return soup
+
 
 def delete_by_min_size(soup, tag, length, children):
     """
@@ -327,6 +335,7 @@ def delete_by_min_size(soup, tag, length, children):
             p.extract()
     return soup
 
+
 def replace_by_paragraph(soup, tag):
     """
 
@@ -341,7 +350,7 @@ def replace_by_paragraph(soup, tag):
 
 
 if __name__ == "__main__":
-    book_readen = ebook(books_file, "./output/")
+    book_readen = EbookProcess(books_file, "./output/")
     html_messages = book_readen.create_multiple_htmls(30)
     for html in html_messages:
         module_logger.debug(html)

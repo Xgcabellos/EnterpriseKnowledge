@@ -1,11 +1,11 @@
 # version v1.0
-from  logging import getLogger,DEBUG,INFO,WARNING,WARN,ERROR,error,basicConfig,debug,info
 import os
 import re
 import sys
 from abc import ABCMeta, abstractmethod
+from logging import INFO, error, basicConfig, debug
 
-import ConnectionProperties
+import connection_properties
 
 __author__ = 'Xavier Garcia Cabellos'
 __date__ = '20180101'
@@ -13,9 +13,9 @@ __version__ = 0.01
 __description__ = 'This scripts handles processing and output of different Email Containers'
 
 
-class abstract_email(object):
+class AbstractEmail(object):
     """abstact class for reading emails from different services"""
-    conx = ConnectionProperties.connexion_properties
+    conx = connection_properties.ConnexionProperties
     log_directory = ""
     __metaclass__ = ABCMeta
 
@@ -104,6 +104,7 @@ class abstract_email(object):
         else:
             log_path = log_name
         basicConfig(filename=log_path, level=level,
-                            format='%(asctime)s | %(levelname)s | %(message)s', filemode='a')
+                    format='%(asctime)s | %(levelname)s | %(message)s', filemode='a')
 
-        debug('Starting mail_process logger using v.' +  + str(__version__) + '  System ' + sys.platform+'  Version ' + sys.version)
+        debug('Starting mail_process logger using v.' + + str(
+            __version__) + '  System ' + sys.platform + '  Version ' + sys.version)

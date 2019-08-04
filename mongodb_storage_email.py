@@ -4,8 +4,8 @@ from logging import getLogger, debug, warning, DEBUG
 
 from pymongo import MongoClient
 
-from StorageEmail import storage_email
-from TextProcess import log_level_conversor
+from storage_email import StorageEmail
+from text_process import log_level_conversor
 
 _author__ = 'Xavier Garcia Cabellos'
 __date__ = '20190420'
@@ -17,18 +17,19 @@ config_name = '../input/config.ini'
 config = configparser.ConfigParser()
 config.read(config_name)
 
-log_name = config[ 'LOGS' ][ 'LOG_FILE' ]
-log_directory = config[ 'LOGS' ][ 'LOG_DIRECTORY' ]
-log_level = log_level_conversor(config[ 'LOGS' ][ 'log_level_json' ])
+log_name = config['LOGS']['LOG_FILE']
+log_directory = config['LOGS']['LOG_DIRECTORY']
+log_level = log_level_conversor(config['LOGS']['log_level_json'])
 
 module_logger = getLogger('MongoDbStorageEmail')
 
 
-class mongodb_storage_email(storage_email):
+class mongodb_storageEmail(StorageEmail):
     driver = None
-    logger=None
-    database='eknowedgedb'
-    def __init__(self,driver,log_file,log_level,log_directory):
+    logger = None
+    database = 'eknowedgedb'
+
+    def __init__(self, driver, log_file, log_level, log_directory):
         if driver is not None:
             self.driver = driver
             monitoring.register(CommandLogger())
@@ -40,20 +41,19 @@ class mongodb_storage_email(storage_email):
 
     def connect(self, url, user, password, authSource=database):
         if self.logger is None:
-            self.logger=self.active_log(mongodb_storage_email + '.log', self.level)
+            self.logger = self.active_log(mongodb_storageEmail + '.log', self.level)
         self.driver = MongoClient(url, username=user,
                                   password=password, authSource=authSource,
-                                  authMechanism='SCRAM-SHA-1', event_listeners=[ CommandLogger() ])
+                                  authMechanism='SCRAM-SHA-1', event_listeners=[CommandLogger()])
         return self.driver
 
     def __del__(self):
         if self.open_db == True:
             self.driver = self.driver.close()
 
-
-    def store(self, msg_list,database='eknowedgedb'):
+    def store(self, msg_list, database='eknowedgedb'):
         """Return the number of message stored"""
-        i=0
+        i = 0
         if self.driver is None:
             self.logger.error('the connection is unable')
             return 0
@@ -82,30 +82,32 @@ class mongodb_storage_email(storage_email):
 
 from pymongo import monitoring
 
+
 class CommandLogger(monitoring.CommandListener):
 
     def started(self, event):
         debug("Command {0.command_name} with request id "
-                     "{0.request_id} started on server "
-                     "{0.connection_id}".format(event))
+              "{0.request_id} started on server "
+              "{0.connection_id}".format(event))
 
     def succeeded(self, event):
         debug("Command {0.command_name} with request id "
-                     "{0.request_id} on server {0.connection_id} "
-                     "succeeded in {0.duration_micros} "
-                     "microseconds".format(event))
+              "{0.request_id} on server {0.connection_id} "
+              "succeeded in {0.duration_micros} "
+              "microseconds".format(event))
 
     def failed(self, event):
         debug("Command {0.command_name} with request id "
-                     "{0.request_id} on server {0.connection_id} "
-                     "failed in {0.duration_micros} "
-                     "microseconds".format(event))
+              "{0.request_id} on server {0.connection_id} "
+              "failed in {0.duration_micros} "
+              "microseconds".format(event))
+
 
 class ServerLogger(monitoring.ServerListener):
 
     def opened(self, event):
         debug("Server {0.server_address} added to topology "
-                     "{0.topology_id}".format(event))
+              "{0.topology_id}".format(event))
 
     def description_changed(self, event):
         previous_server_type = event.previous_description.server_type
@@ -119,34 +121,35 @@ class ServerLogger(monitoring.ServerListener):
 
     def closed(self, event):
         warning("Server {0.server_address} removed from topology "
-                        "{0.topology_id}".format(event))
+                "{0.topology_id}".format(event))
 
 
 class HeartbeatLogger(monitoring.ServerHeartbeatListener):
 
     def started(self, event):
         debug("Heartbeat sent to server "
-                     "{0.connection_id}".format(event))
+              "{0.connection_id}".format(event))
 
     def succeeded(self, event):
         # The reply.document attribute was added in PyMongo 3.4.
         debug("Heartbeat to server {0.connection_id} "
-                     "succeeded with reply "
-                     "{0.reply.document}".format(event))
+              "succeeded with reply "
+              "{0.reply.document}".format(event))
 
     def failed(self, event):
         warning("Heartbeat to server {0.connection_id} "
-                        "failed with error {0.reply}".format(event))
+                "failed with error {0.reply}".format(event))
+
 
 class TopologyLogger(monitoring.TopologyListener):
 
     def opened(self, event):
         debug("Topology with id {0.topology_id} "
-                     "opened".format(event))
+              "opened".format(event))
 
     def description_changed(self, event):
         debug("Topology description updated for "
-                     "topology id {0.topology_id}".format(event))
+              "topology id {0.topology_id}".format(event))
         previous_topology_type = event.previous_description.topology_type
         new_topology_type = event.new_description.topology_type
         if new_topology_type != previous_topology_type:
@@ -164,47 +167,44 @@ class TopologyLogger(monitoring.TopologyListener):
 
     def closed(self, event):
         debug("Topology with id {0.topology_id} "
-                     "closed".format(event))
-
-
+              "closed".format(event))
 
 
 def main():
-    log_level_json=DEBUG
+    log_level_json = DEBUG
     json_directory = './json/'
     users_file = "../input/users.csv"
     books_directory = '../input/books/'
     knowledge_file = "../input/knowledges.csv"
     module_logger = getLogger('MongoDbStorageEmail')
 
-
-    json_store = mongodb_storage_email(None, log_name, log_level_json, log_directory)
+    json_store = mongodb_storageEmail(None, log_name, log_level_json, log_directory)
     json_store.connect('localhost', 'admin', 'Gandalf6981', 'admin')
     import json
     from bson.json_util import loads
 
-    with open(json_directory+'xgcabellos.gmail0_INBOX.json', 'r') as f:
+    with open(json_directory + 'xgcabellos.gmail0_INBOX.json', 'r') as f:
         data = json.load(f)
-    json_list=[]
+    json_list = []
     for doc in data:
         data_json = loads(json.dumps(doc))
         json_list.append(data_json)
     json_store.store(json_list)
 
-    db = json_store.driver['eknowegdedb' ]
+    db = json_store.driver['eknowegdedb']
     emails = db.emails
-    senders = [ i for i in emails.distinct("From") ]
+    senders = [i for i in emails.distinct("From")]
 
-    receivers = [ i for i in emails.distinct("To") ]
+    receivers = [i for i in emails.distinct("To")]
 
-    cc_receivers = [ i for i in emails.distinct("Cc") ]
+    cc_receivers = [i for i in emails.distinct("Cc")]
 
-    bcc_receivers = [ i for i in emails.distinct("Bcc") ]
+    bcc_receivers = [i for i in emails.distinct("Bcc")]
 
-    print( "Num Senders: %i", len(senders))
-    print( "Num Receivers: %i", len(receivers))
-    print( "Num CC Receivers: %i", len(cc_receivers))
-    print( "Num BCC Receivers: %i", len(bcc_receivers))
+    print("Num Senders: %i", len(senders))
+    print("Num Receivers: %i", len(receivers))
+    print("Num CC Receivers: %i", len(cc_receivers))
+    print("Num BCC Receivers: %i", len(bcc_receivers))
 
     # db = client['eknowedgedb']
     # emails = db.emails
@@ -239,5 +239,5 @@ def main():
     # user.save()
 
 
-if  __name__ == '__main__':
+if __name__ == '__main__':
     main()

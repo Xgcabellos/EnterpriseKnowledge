@@ -22,52 +22,50 @@ from jinja2 import Template
 from psutil._compat import xrange
 from py._xmlgen import unicode
 
-from AbstractProcess import abstract_email
-from ConnectionProperties import email_DUMMY_connexion_properties
-from TextProcess import text_process, log_level_conversor
+from abstract_process import AbstractEmail
+from connection_properties import email_DUMMY_connexionProperties
+from text_process import TextProcess, log_level_conversor
 
 # from os import makedirs,getoid
 
 __author__ = 'Xavier Garcia Cabellos'
 __date__ = '20190101'
 __version__ = 0.01
-__description__ = 'This scripts handles processing and output of gmail and  Email Containers'
+__description__ = 'This scripts handles processing and output of Gmail and  Email Containers'
 
 config_name = '../input/config.ini'
 
 config = configparser.ConfigParser()
 config.read(config_name)
 
-
-log_name = config[ 'LOGS' ][ 'LOG_FILE' ]
-log_directory = config[ 'LOGS' ][ 'LOG_DIRECTORY' ]
-log_level = log_level_conversor(config[ 'LOGS' ][ 'log_level_email' ])
+log_name = config['LOGS']['LOG_FILE']
+log_directory = config['LOGS']['LOG_DIRECTORY']
+log_level = log_level_conversor(config['LOGS']['log_level_email'])
 
 module_logger = getLogger('EmailProcess')
 
-
 date_dict = {x: 0 for x in xrange(1, 25)}
-date_list = [ date_dict.copy() for x in xrange(7) ]
+date_list = [date_dict.copy() for x in xrange(7)]
 
-FORBIDDEN_TAGS = config[ 'FILTERS' ][ 'EMAIL_HEADER_FIELDS_NOT_STORED' ]
+FORBIDDEN_TAGS = config['FILTERS']['EMAIL_HEADER_FIELDS_NOT_STORED']
 
 
-class gmail(abstract_email):
+class Gmail(AbstractEmail):
     """ Class for read email from google Mapi"""
     mail = IMAP4
     connected = False
-    folder_list = [ ]
+    folder_list = []
     folder_dict_size = {}
     folder_dict_data = {}
     status = 0
     logger = None
 
-    output_directory = config[ 'OUTPUT' ][ 'DIRECTORY_OUTPUT' ]  # './output/'
+    output_directory = config['OUTPUT']['DIRECTORY_OUTPUT']  # './output/'
     json_directory = config['OUTPUT']['DIRECTORY_JSON']
 
     json_store = None
     date_dict = {x: 0 for x in xrange(1, 25)}
-    date_list = [ date_dict.copy() for x in xrange(7) ]
+    date_list = [date_dict.copy() for x in xrange(7)]
 
     def __init__(self, con, foldersSize=True, logger=None, email=None):
         """init with connection data and email object inicialided"""
@@ -95,18 +93,18 @@ class gmail(abstract_email):
         if foldersSize:
             self.logger.debug('List of folders read in {}'.format(str(self.folder_list)))
             for folder in self.folder_list:
-                name_folder = str(folder).split('"/"')[ -1 ]  # ('"')[-2]
+                name_folder = str(folder).split('"/"')[-1]  # ('"')[-2]
                 # be careful - with google is not exactly the same. verify.
 
                 name_folder = name_folder.replace('\'', '').replace('"', '').strip()
                 try:
                     self.mail.select('"' + name_folder + '"')
                     result, data = self.mail.uid('search', None, "ALL")
-                    size_folder = len(data[ 0 ].split())
+                    size_folder = len(data[0].split())
                     # Size of the folder. means number of messages
-                    self.folder_dict_size[ name_folder ] = size_folder
+                    self.folder_dict_size[name_folder] = size_folder
                     # data is the number of the message, not the message.
-                    self.folder_dict_data[ name_folder ] = data
+                    self.folder_dict_data[name_folder] = data
                     self.logger.debug("Reading (" + str(name_folder) + "):" + str(size_folder) +
                                       " email inside. Forbidden= %s", forbidden(folder))
                 except Exception as read_exp:
@@ -145,14 +143,14 @@ class gmail(abstract_email):
         return self.mail
 
     def get_type(self):
-        return 'gmail'
+        return 'Gmail'
 
     def read(self, start, stop, folder):
         counter = stop - start
         number_messages = 0
         try:
 
-            msg_list = [ ]
+            msg_list = []
             try:
                 number_messages = self.mail.select('"' + folder + '"')
             except Exception as read_exp:
@@ -161,20 +159,20 @@ class gmail(abstract_email):
 
             result, data = self.mail.uid('search', None, "ALL")
             # search and return uids instead
-            list_of_uids = data[ 0 ].split()  # data[0] is a space separate string
+            list_of_uids = data[0].split()  # data[0] is a space separate string
             i = len(list_of_uids)
             # stop=counter
             if stop > i: stop = i
             if i == 0:
                 return msg_list
             else:
-                latest_email_uid = list_of_uids[ stop - 1 ]  # unique ids wrt label selected
+                latest_email_uid = list_of_uids[stop - 1]  # unique ids wrt label selected
             list_of_uids2 = ''
             try:
                 for y in range(start, stop):
                     if y > start:
                         list_of_uids2 += ','
-                    list_of_uids2 += str(list_of_uids[ y ].decode('ascii'))
+                    list_of_uids2 += str(list_of_uids[y].decode('ascii'))
                 # result, email_data = self.mail.uid('fetch', latest_email_uid, '(RFC822)')
                 result, email_data = self.mail.uid('fetch', list_of_uids2, '(RFC822)')
                 # fetch the email body (RFC822) for the given ID
@@ -209,16 +207,16 @@ class gmail(abstract_email):
                     if isinstance(response_part, tuple):
                         # continue inside the same for loop as above
                         try:
-                            response_part_string = response_part[ 1 ].decode('utf-8', errors='ignore')  # 'strict'
+                            response_part_string = response_part[1].decode('utf-8', errors='ignore')  # 'strict'
                         except Exception as read_exp:
                             self.logger.error(
                                 'error in response part ' + str(latest_email_uid) + ' with number of  ' + str(
                                     stop - start) +
                                 ' of ' + str(number_messages) + ' messages in folder '
                                 + folder + ' Error Message:' + str(read_exp))
-                            response_part_string = response_part[ 1 ].decode('utf-8', errors='ignore')
+                            response_part_string = response_part[1].decode('utf-8', errors='ignore')
 
-                        id_message_string = response_part[ 0 ].decode('utf-8', errors='ignore')
+                        id_message_string = response_part[0].decode('utf-8', errors='ignore')
 
                         msg = message_from_string(response_part_string, policy=policy.default)
                         msg_list.append(msg)
@@ -255,8 +253,8 @@ class gmail(abstract_email):
     #         self.logger.exception("Global error in read_all " + size_blocks)
 
     def jsonizer_emails(self, msg_list):
-        jsonified_messages = [ self.jsonifyMessage(m) for m in msg_list ]
-        content = [ p[ 'content' ] for m in jsonified_messages for p in m[ 'parts' ] ]
+        jsonified_messages = [self.jsonifyMessage(m) for m in msg_list]
+        content = [p['content'] for m in jsonified_messages for p in m['parts']]
         # Content can still be quite messy and contain line breaks and other quirks.
 
         return jsonified_messages
@@ -269,36 +267,34 @@ class gmail(abstract_email):
         """
 
         FORBIDDEN_TAGS_LIST = FORBIDDEN_TAGS.split(',')
-        json_msg = {'parts': [ ]}
-        #with this i'm going to eliminate almos all microsoft internal tags.
+        json_msg = {'parts': []}
+        # with this i'm going to eliminate almos all microsoft internal tags.
         for (k, v) in msg.items():
-            if any(FORBIDL.upper() in k.upper() for FORBIDL in  FORBIDDEN_TAGS_LIST):
+            if any(FORBIDL.upper() in k.upper() for FORBIDL in FORBIDDEN_TAGS_LIST):
                 continue
             else:
                 if 'Message-Id' in k:
                     if v is not None:
-                        json_msg[ 'Message-Id' ] = clean_id(v)
+                        json_msg['Message-Id'] = clean_id(v)
                 elif 'Message-ID' in k:
                     if v is not None:
-                        json_msg[ 'Message-Id' ] = clean_id(v)
+                        json_msg['Message-Id'] = clean_id(v)
                 elif 'In-Reply-To' in k:
                     if v is not None:
-                        json_msg[ 'In-Reply-To' ] = clean_id(v)
+                        json_msg['In-Reply-To'] = clean_id(v)
                 elif 'Thread-Index' in k:
                     if v is not None:
-                        json_msg[ 'Thread-Index' ] = clean_id(v)
+                        json_msg['Thread-Index'] = clean_id(v)
                 else:
-                    json_msg[ k ] = v  # .decode('utf-8', 'ignore')
-
-
+                    json_msg[k] = v  # .decode('utf-8', 'ignore')
 
         # The To, Cc, and Bcc fields, if present, could have multiple items.
         # Note that not all of these fields are necessarily defined.
 
-        for k in [ 'To', 'Cc', 'Bcc' ]:
+        for k in ['To', 'Cc', 'Bcc']:
             if not json_msg.get(k):
                 continue
-            json_msg[ k ] = json_msg[ k ].replace('\n', '').replace('\t', '').replace('\r', '').replace(' ', '').split(
+            json_msg[k] = json_msg[k].replace('\n', '').replace('\t', '').replace('\r', '').replace(' ', '').split(
                 ',')  # .decode('utf-8', 'ignore').split(',')
         for part in msg.walk():
             json_part = {}
@@ -307,43 +303,44 @@ class gmail(abstract_email):
             if part.get_content_maintype() == 'multipart':
                 continue
 
-            json_part[ 'contentType' ] = part.get_content_type()
+            json_part['contentType'] = part.get_content_type()
 
             if part.get_content_type() == 'text/plain':
                 text = unicode(part.get_payload(decode=True).decode('utf-8', 'replace'))
-                json_part[ 'content' ] = text_process.clean_email(text)
+                json_part['content'] = TextProcess.clean_email(text)
             else:
                 if part.get_content_type() == 'text/html':
                     html = self.cleanContent(part.get_payload(decode=True))
-                    json_part[ 'content' ] = text_process.clean_email(html)  # .replace('\n', '').replace('\t', '').replace('\r', '')
+                    json_part['content'] = TextProcess.clean_email(
+                        html)  # .replace('\n', '').replace('\t', '').replace('\r', '')
                 else:
-                    json_part[ 'content' ] = part.get_content_maintype() + ' deleted due the type:{}'.format(
+                    json_part['content'] = part.get_content_maintype() + ' deleted due the type:{}'.format(
                         part.get_content_type())
 
-            json_msg[ 'parts' ].append(json_part)
+            json_msg['parts'].append(json_part)
 
         # Finally, convert date from asctime to milliseconds since epoch using the
         # $date descriptor so it imports "natively" as an ISODate object in MongoDB.
         try:
             if 'Received' in json_msg:
-                if json_msg[ 'Received' ] != None:
+                if json_msg['Received'] != None:
                     if 'Date' not in json_msg:
-                        json_msg[ 'Date' ] = json_msg[ 'Received' ].split(';')[ 1 ]
+                        json_msg['Date'] = json_msg['Received'].split(';')[1]
 
             if 'Date' in json_msg:
-                if json_msg[ 'Date' ] != None:
+                if json_msg['Date'] != None:
                     date = None
 
                     # avoid problems with the day of week in text
                     try:
-                        date = json_msg[ 'Date' ].split(',')[ 1 ]
+                        date = json_msg['Date'].split(',')[1]
                     except Exception as e:
-                        self.logger.debug("error splitting Date :" + str(json_msg[ 'Date' ]))
+                        self.logger.debug("error splitting Date :" + str(json_msg['Date']))
                         date = None
 
                     # if the weekday in text does exist...
                     if date is None or date == '':
-                        date = json_msg[ 'Date' ]
+                        date = json_msg['Date']
 
                     then = parse(date)
                     # millis = int(time.mktime(then.timetuple()) * 1000 + then.microsecond / 1000)
@@ -352,10 +349,10 @@ class gmail(abstract_email):
 
 
         except Exception as e:
-            self.logger.error("error parsing Date :" + str(json_msg[ 'Date' ]) + ' : ' + str(e))
+            self.logger.error("error parsing Date :" + str(json_msg['Date']) + ' : ' + str(e))
 
         # The final point is to process the paraphs
-        proc = text_process()
+        proc = TextProcess()
         proc.clean_json_message(json_msg)
 
         return json_msg
@@ -375,7 +372,7 @@ class gmail(abstract_email):
         # Strip out HTML tags, if any are present.
         # Bail on unknown encodings if errors happen in BeautifulSoup.
         try:
-            # text = text_process.parse_reply(text)
+            # text = TextProcess.parse_reply(text)
             soup = BeautifulSoup(msg, "lxml")
 
         except Exception as e:
@@ -392,62 +389,62 @@ class gmail(abstract_email):
         message_processed = {}  # {'subject':None,'sender':None,'header':None,'body':None,'From':None,'To':None, 'Cc':None, 'Bcc':None, 'Return-Path':None, 'Date':None,
         # 'Message-Id':None, 'Content-type':None,'Content-Transfer-Encoding':None}
 
-        message_processed[ "subject" ] = message[ 'Subject' ]
-        message_processed[ "header" ] = message._headers
+        message_processed["subject"] = message['Subject']
+        message_processed["header"] = message._headers
 
         for (k, v) in message.items():
-            for k2 in [ 'From', 'To', 'Cc', 'Bcc', 'Return-Path', 'Date', 'Message-Id', 'Content-type',
-                        'Content-Transfer-Encoding' ]:
+            for k2 in ['From', 'To', 'Cc', 'Bcc', 'Return-Path', 'Date', 'Message-Id', 'Content-type',
+                       'Content-Transfer-Encoding']:
                 if not str.lower(k) == str.lower(k2):
                     continue
-                message_processed[ k ] = v
+                message_processed[k] = v
 
-        message_processed[ "sender" ] = message_processed[ 'From' ]
+        message_processed["sender"] = message_processed['From']
 
         for part in message.walk():
             # print('content type: ' + part.get_content_maintype())
             if part.get_content_maintype() == 'multipart':
                 continue
 
-            message_processed[ 'contentType' ] = part.get_content_type()
+            message_processed['contentType'] = part.get_content_type()
             if part.get_content_type() == 'text/plain':
                 text = unicode(part.get_payload(decode=True).decode('utf-8', 'replace'))
-                text = text_process.parse_reply(text)
-                message_processed[ 'content' ] = str(text)
+                text = TextProcess.parse_reply(text)
+                message_processed['content'] = str(text)
 
             else:
                 if part.get_content_type() == 'text/html':
-                    message_processed[ 'content' ] = self.cleanContent(part.get_payload(decode=True))
+                    message_processed['content'] = self.cleanContent(part.get_payload(decode=True))
 
                 else:
                     message_processed[
-                        'content' ] = 'Content  deleted because it is a content type ' + part.get_content_type()
+                        'content'] = 'Content  deleted because it is a content type ' + part.get_content_type()
 
         # try:
         #    message_processed["creation_time"] = message.creation_time
         # except Exception as creation_time_exp:
         #    logging.warning("creation_time not read"+str(creation_time_exp))
-        message_processed[ "creation_time" ] = None
+        message_processed["creation_time"] = None
         # tr:
         #    message_processed["submit_time"] = message.client_submit_time
         # except Exception as submit_time_exp:
         #    logging.warning("submit_time not read"+str(submit_time_exp))
-        message_processed[ "submit_time" ] = None
+        message_processed["submit_time"] = None
         # try:
         #    message_processed["delivery_time"] = message.delivery_time
         # except Exception as delivery_time_exp:
         #    logging.warning("delivery_time not read"+str(delivery_time_exp))
-        message_processed[ "delivery_time" ] = None
+        message_processed["delivery_time"] = None
 
         if 'Received' in message:
-            if message[ 'Received' ] != None:
+            if message['Received'] != None:
                 if 'Date' not in message:
-                    message_processed[ 'Date' ] = message[ 'Received' ].split(';')[ 1 ]
-                    message_processed[ "delivery_time" ] = message[ 'Received' ].split(';')[ 1 ]
+                    message_processed['Date'] = message['Received'].split(';')[1]
+                    message_processed["delivery_time"] = message['Received'].split(';')[1]
             else:
-                message_processed[ "delivery_time" ] = None
+                message_processed["delivery_time"] = None
                 self.logger.error('Delivery time doesnt exist in %s', str(message))
-        message_processed[ "attachment_count" ] = 0  # be careful. not real
+        message_processed["attachment_count"] = 0  # be careful. not real
         return message_processed
 
     def checkForMessages(self, start_email_num, finish_email_num, name_folder):
@@ -461,7 +458,7 @@ class gmail(abstract_email):
         if email_list is not None:
             if len(email_list) > 0 and self.json_store is not None:
                 # folder can have slash in meddle of the name.
-                file = self.conx.FROM_EMAIL.split('@')[ 0 ] + '.' + self.conx.FROM_EMAIL.split('@')[ 1 ] + '.' + \
+                file = self.conx.FROM_EMAIL.split('@')[0] + '.' + self.conx.FROM_EMAIL.split('@')[1] + '.' + \
                        str(start_email_num) + '.' + str(name_folder).replace('/', '.') + '.json'
                 self.logger.debug('Read ' + str(len(email_list)) + ' email messages in ' + name_folder)
                 jsonified_messages = self.jsonizer_emails(email_list)
@@ -470,7 +467,7 @@ class gmail(abstract_email):
                 if self.json_store.storage_type() == 'file':
                     self.json_store.store(jsonified_messages, self.json_directory, file)
                 else:
-                    self.json_store.store(jsonified_messages, self.conx.FROM_EMAIL.split('@')[ 1 ].split('.')[ 0 ])
+                    self.json_store.store(jsonified_messages, self.conx.FROM_EMAIL.split('@')[1].split('.')[0])
         return email_list
 
     def folderReport(self, message_list, name=""):
@@ -483,11 +480,11 @@ class gmail(abstract_email):
         if not len(message_list):
             # self.logger.debug("Empty message not processed")
             return
-        message_list = gmail.email_filter(message_list)
+        message_list = Gmail.email_filter(message_list)
         # CSV Report
-        fout_path = gmail.makePath(name + "_report.csv", gmail.output_directory)
+        fout_path = Gmail.makePath(name + "_report.csv", Gmail.output_directory)
         fout = open(fout_path, 'wb')
-        header = [ 'creation_time', 'submit_time', 'delivery_time', 'sender', 'subject', 'attachment_count' ]
+        header = ['creation_time', 'submit_time', 'delivery_time', 'sender', 'subject', 'attachment_count']
         csv_fout = csv.DictWriter(fout, fieldnames=header, extrasaction='ignore')
         csv_fout.writeheader()
         csv_fout.writerows(message_list)
@@ -495,43 +492,43 @@ class gmail(abstract_email):
 
         # HTML Report Prep
         global date_list  # Allow access to edit global variable
-        body_out = open(gmail.makePath(name + "_message_body.txt", gmail.output_directory), 'a')
-        senders_out = open(gmail.makePath(name + "_senders_names.txt", gmail.output_directory), 'a')
+        body_out = open(Gmail.makePath(name + "_message_body.txt", Gmail.output_directory), 'a')
+        senders_out = open(Gmail.makePath(name + "_senders_names.txt", Gmail.output_directory), 'a')
         for m in message_list:
-            if m[ 'content' ]:
-                body_out.write(str(m[ 'content' ]) + "\n\n")
+            if m['content']:
+                body_out.write(str(m['content']) + "\n\n")
 
-            if m[ 'sender' ]:
-                senders_out.write(m[ 'sender' ] + '\n')
+            if m['sender']:
+                senders_out.write(m['sender'] + '\n')
                 # if 'Message-Id' in m:
                 #     self.logger.debug("writing " + str(m['Message-Id'])+":"+m['sender'])
                 # else:
                 #     self.logger.debug("writing " + str(m['Message-ID']) + ":" + m['sender'])
             # Creation Time
-            if m[ 'creation_time' ] != None:
-                dateCT = parse(m[ 'creation_time' ])
+            if m['creation_time'] != None:
+                dateCT = parse(m['creation_time'])
                 day_of_week = dateCT.weekday()
                 hour_of_day = dateCT.hour + 1
-                date_list[ day_of_week ][ hour_of_day ] += 1
+                date_list[day_of_week][hour_of_day] += 1
                 if len(name) > 0:
-                    self.date_list[ day_of_week ][ hour_of_day ] += 1
+                    self.date_list[day_of_week][hour_of_day] += 1
             # Submit Time
-            if m[ 'submit_time' ] != None:
-                dateST = parse(m[ 'submit_time' ])
+            if m['submit_time'] != None:
+                dateST = parse(m['submit_time'])
                 day_of_week = dateST.weekday()
                 hour_of_day = dateST.hour + 1
-                date_list[ day_of_week ][ hour_of_day ] += 1
+                date_list[day_of_week][hour_of_day] += 1
                 if len(name) > 0:
-                    self.date_list[ day_of_week ][ hour_of_day ] += 1
+                    self.date_list[day_of_week][hour_of_day] += 1
             # Delivery Time
-            if m[ 'delivery_time' ] != None:
+            if m['delivery_time'] != None:
                 # date=time.strptime(m[ 'delivery_time' ])
-                date = parse(m[ 'delivery_time' ])
+                date = parse(m['delivery_time'])
                 day_of_week = date.weekday()
                 hour_of_day = date.hour + 1
-                date_list[ day_of_week ][ hour_of_day ] += 1
+                date_list[day_of_week][hour_of_day] += 1
                 if len(name) > 0:
-                    self.date_list[ day_of_week ][ hour_of_day ] += 1
+                    self.date_list[day_of_week][hour_of_day] += 1
 
         body_out.close()
         senders_out.close()
@@ -543,11 +540,11 @@ class gmail(abstract_email):
         :return: A list of word frequency counts
         """
         word_list = Counter()
-        for line in open(gmail.makePath(name + "_message_body.txt", gmail.output_directory), 'r').readlines():
+        for line in open(Gmail.makePath(name + "_message_body.txt", Gmail.output_directory), 'r').readlines():
             for word in line.split():
                 # Prevent too many false positives/common words
                 if word.isalnum() and len(word) > 4:
-                    word_list[ word ] += 1
+                    word_list[word] += 1
 
         return self.wordReport(word_list, name)
 
@@ -561,17 +558,17 @@ class gmail(abstract_email):
             self.logger.debug('Message body statistics not available')
             return
 
-        fout = open(gmail.makePath(name + "_frequent_words.csv", gmail.output_directory), 'w')
+        fout = open(Gmail.makePath(name + "_frequent_words.csv", Gmail.output_directory), 'w')
         fout.write('Count,Word\\n')
         for e in word_list.most_common():
             if (len(e) > 1):
-                fout.write(str(e[ 1 ]) + "," + str(e[ 0 ]) + "\n")
+                fout.write(str(e[1]) + "," + str(e[0]) + "\n")
 
         fout.close()
 
-        html_report_list = [ ]
+        html_report_list = []
         for e in word_list.most_common(10):
-            html_report_list.append({"word": str(e[ 0 ]), "count": str(e[ 1 ])})
+            html_report_list.append({"word": str(e[0]), "count": str(e[1])})
 
         return html_report_list
 
@@ -582,18 +579,18 @@ class gmail(abstract_email):
         :return: html_report_list, a list of the most frequent senders
         """
         sn = name + "_senders_names.txt"
-        sender_list = Counter(open(gmail.makePath(sn, gmail.output_directory), 'r').readlines())
+        sender_list = Counter(open(Gmail.makePath(sn, Gmail.output_directory), 'r').readlines())
 
-        fout = open(gmail.makePath(sn.split('.')[ 0 ] + '.csv', gmail.output_directory), 'w')
+        fout = open(Gmail.makePath(sn.split('.')[0] + '.csv', Gmail.output_directory), 'w')
         fout.write("Count,Sender\n")
         for e in sender_list.most_common():
             if len(e) > 1:
-                fout.write(str(e[ 1 ]) + "," + str(e[ 0 ]))
+                fout.write(str(e[1]) + "," + str(e[0]))
         fout.close()
 
-        html_report_list = [ ]
+        html_report_list = []
         for e in sender_list.most_common(5):
-            html_report_list.append({"label": str(e[ 0 ]), "count": str(e[ 1 ])})
+            html_report_list.append({"label": str(e[0]), "count": str(e[1])})
 
         return html_report_list
 
@@ -603,7 +600,7 @@ class gmail(abstract_email):
         is static within the HTML dashboard
         :return: None
         """
-        csv_out = open(gmail.makePath(name + "_heatmap.tsv", gmail.output_directory), 'w')
+        csv_out = open(Gmail.makePath(name + "_heatmap.tsv", Gmail.output_directory), 'w')
         if name == "":
             dl = date_list
         else:
@@ -632,12 +629,12 @@ class gmail(abstract_email):
                    "word_frequency": top_words, "percentage_by_sender": top_senders}
         new_html = html_template.render(context)
 
-        html_report_file = open(gmail.makePath(report_title + "_" + pst_name + ".html", gmail.output_directory), 'w')
+        html_report_file = open(Gmail.makePath(report_title + "_" + pst_name + ".html", Gmail.output_directory), 'w')
         html_report_file.write(new_html)
         html_report_file.close()
 
     def summary(self, message_list, name, blocks=100):
-        messages = [ ]
+        messages = []
         try:
 
             for m in message_list:
@@ -674,7 +671,7 @@ class gmail(abstract_email):
 
         basicConfig(filename=log_path, level=level,
                     format='%(asctime)s | %(levelname)s | %(name)s | %(processName)s | %(message)s', filemode='a')
-        logger = getLogger("EmailProcess.gmail")
+        logger = getLogger("EmailProcess.Gmail")
         logger.debug('Starting email_process logger using v.' + str(
             __version__) + '  System ' + platform + '  Version ' + version)
         return logger
@@ -682,10 +679,10 @@ class gmail(abstract_email):
 
 def summary(message_list):
     try:
-        messages = [ ]
+        messages = []
         if len(message_list) > 0:
             name = ""
-            m = gmail(email_DUMMY_connexion_properties())
+            m = Gmail(email_DUMMY_connexionProperties())
             for message in message_list:
                 messages.append(m.processMessage(message))
             m.folderReport(messages, name)
@@ -707,12 +704,12 @@ FORBIDDEN_FOLDER = {'NOSELECT', 'TRASH', 'JUNK', 'SPAM', 'DRAFT', 'ALL', 'CHATS'
 FORBIDDEN_FOLDER_BY_LANGUAGE = {'BORRADORES', 'PAPELERA', 'CORREO ELECTR&APM-NICO NO DESEADO', 'CALENDARIO',
                                 'TODOS', 'IMPORTANTES', 'PROGRAMADOS', 'DESTACADOS', 'CONTACTOS', 'NO DESEADO',
                                 'ELIMINADOS', 'TASKS', 'TAREAS', 'BORRADORES', 'SINCRONI'}
-TEMPORAL_RUN_FOLDER = {'INBOX' } #, 'SENT', 'ENVIADOS', 'ARCHIVO', 'HISTORY'}
+TEMPORAL_RUN_FOLDER = {'INBOX'}  # , 'SENT', 'ENVIADOS', 'ARCHIVO', 'HISTORY'}
 
 
 def forbidden(folder):
     # name_folder = str(folder).split('"')[ -2 ]
-    name_folder = str(folder).split('"/"')[ -1 ]
+    name_folder = str(folder).split('"/"')[-1]
     # be careful - with google is not exactly the same. verify.
 
     name_folder = name_folder.replace('\'', '').replace('"', '').strip()
@@ -734,7 +731,7 @@ def forbidden(folder):
             continue
         ########################################################################################
         ## be careful TEMPORAL. just for minimize the number of folders...
-        #if any(FORBIDT   not in w.upper()  for FORBIDT in TEMPORAL_RUN_FOLDER):
+        # if any(FORBIDT   not in w.upper()  for FORBIDT in TEMPORAL_RUN_FOLDER):
         #    forbidden = True
         # else:
         #     forbidden = False

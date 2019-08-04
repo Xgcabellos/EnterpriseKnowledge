@@ -1,14 +1,14 @@
-import logging, csv
-from typing import Dict, Any, List, Union
+import csv
+import logging
 import os
-
 import random
-
-import EbookProcess
 import sys
-import pandas as pd
 from collections import deque
-import numpy as np
+from typing import Dict, Any, List
+
+import pandas as pd
+
+import ebook_process
 
 _author__ = 'Xavier Garcia Cabellos'
 __date__ = '20190326'
@@ -20,7 +20,8 @@ __description__ = 'this class will create a message to dend'
 
 module_logger = logging.getLogger('EmployeeEmailworker')
 log_name = 'Sending_Emails.log'
-log_level=logging.INFO
+log_level = logging.INFO
+
 
 class message_html:
     title = None
@@ -50,79 +51,75 @@ class emailworker:
     _messages_fw = None
     _messages_co = None
     _messages_answer = None
-    list_ofmessage_processed =None
+    list_ofmessage_processed = None
     list_ofmessage = None
     list_workers = None
     know = None
     max_number_of_chats = 3
-    message_by_chat=4
-    total_chats_by_users=6
-    index=0
-    level=log_level
-    log_name=log_name
+    message_by_chat = 4
+    total_chats_by_users = 6
+    index = 0
+    level = log_level
+    log_name = log_name
 
     def __init__(self, allusersinfo, know, list_ofmessage, list_workers, name, log_directory="./output/"):
 
-        self.logger = self.active_log(self.log_name , self.level ,log_directory)
-
-
+        self.logger = self.active_log(self.log_name, self.level, log_directory)
 
         try:
             # allusersinfo[ allusersinfo[ 'mail' ].str.match(name) ]
-            userRow = allusersinfo[ allusersinfo[ 'email' ].str.match(name) ].iloc[ 0 ]
+            userRow = allusersinfo[allusersinfo['email'].str.match(name)].iloc[0]
             self.know = know
-            self.user = userRow[ 'user' ]
-            self.level = userRow[ 'level' ]
-            self.department = userRow[ 'department' ]
-            self.knowledge = userRow[ 'knowledge' ]
-            self.knowledge2 = userRow[ 'knowledge2' ]
-            self.knowledge3 = userRow[ 'knowledge3' ]
-            self.structured_name = userRow[ 'sername' ]
-            self.email = userRow[ 'email' ]
+            self.user = userRow['user']
+            self.level = userRow['level']
+            self.department = userRow['department']
+            self.knowledge = userRow['knowledge']
+            self.knowledge2 = userRow['knowledge2']
+            self.knowledge3 = userRow['knowledge3']
+            self.structured_name = userRow['sername']
+            self.email = userRow['email']
             assert self.email == name
             self.list_ofmessage = list_ofmessage
             self.list_workers = list_workers
             # self.logger.debug((self.user, self.level, self.department, self.knowledge, self.knowledge2, self.knowledge3,
             #                  self.structured_name, self.email))
             list_workers.append(self)
-            self.list_ofmessage_processed=[]
+            self.list_ofmessage_processed = []
         except Exception as emailworkerException:
-            logging.error("Error looking for info of " + name + ". Error reading data:  %s",emailworkerException)
+            logging.error("Error looking for info of " + name + ". Error reading data:  %s", emailworkerException)
 
-    def processor(self, allusersinfo, know, index=0,list_ofmessage=None, list_workers=None):
+    def processor(self, allusersinfo, know, index=0, list_ofmessage=None, list_workers=None):
         if list_workers is None:
             list_workers = self.list_workers
         if list_ofmessage is None:
             list_ofmessage = self.list_ofmessage
-        array = [ know ]
+        array = [know]
         lastLevel = False
-        self.index=index
+        self.index = index
         userslevel1low_with_knowledge = False
-       # self.logger.debug((self.user, self.level, self.department, self.knowledge, self.knowledge2, self.knowledge3,
-       #                    self.structured_name, self.email, self.max_number_of_chats))
+        # self.logger.debug((self.user, self.level, self.department, self.knowledge, self.knowledge2, self.knowledge3,
+        #                    self.structured_name, self.email, self.max_number_of_chats))
 
         userslevel1low = allusersinfo.loc[
-            (allusersinfo[ 'level' ] == self.level - 1) & (allusersinfo[ 'knowledge' ].isin(array))  ]
+            (allusersinfo['level'] == self.level - 1) & (allusersinfo['knowledge'].isin(array))]
 
         if (userslevel1low is None or len(userslevel1low.index) == 0):
-            userslevel1low = allusersinfo.loc[ (allusersinfo[ 'level' ] == self.level - 1) ]
+            userslevel1low = allusersinfo.loc[(allusersinfo['level'] == self.level - 1)]
             if (userslevel1low is None or len(userslevel1low.index) == 0):
                 lastLevel = True
         else:
             userslevel1low_with_knowledge = True
         userssamelevel = allusersinfo.loc[
-            (allusersinfo[ 'level' ] == self.level) & (allusersinfo[ 'knowledge' ].isin(array))]
+            (allusersinfo['level'] == self.level) & (allusersinfo['knowledge'].isin(array))]
         if (len(userssamelevel.index) <= 1):
             if not lastLevel:
-                userssamelevel = allusersinfo.loc[ (allusersinfo[ 'level' ] == self.level) ]
+                userssamelevel = allusersinfo.loc[(allusersinfo['level'] == self.level)]
             else:
                 return self.list_ofmessage_processed
-
 
         chats = self.message_by_chat
         total_chats = self.total_chats_by_users
         nobody_know = len(userslevel1low.index)
-
 
         if self.max_number_of_chats > 0:
             if self.knowledge == know or (nobody_know > 0 and userslevel1low_with_knowledge):
@@ -130,10 +127,10 @@ class emailworker:
                 count = len(list_ofmessage)
                 if nobody_know > 0:
                     for index, row_level1 in userslevel1low.iterrows():
-                        if count>0:
-                            if (row_level1[ 'knowledge' ] == know ) :
+                        if count > 0:
+                            if (row_level1['knowledge'] == know):
                                 for index2, row_same_level in userssamelevel.iterrows():
-                                    if row_same_level[ 'email' ] == self.email or count==0:
+                                    if row_same_level['email'] == self.email or count == 0:
                                         continue
                                     else:
                                         list_ofmessage2 = deque()
@@ -150,17 +147,21 @@ class emailworker:
                                             for i in range(0, count):
                                                 list_ofmessage2.append(list_ofmessage.pop())
                                                 count -= 1
-                                        self.make_conversation(list_ofmessage2, self.email, row_level1[ 'email' ],
-                                                               row_same_level[ 'email' ], row_same_level[ 'email' ],
-                                                               row_same_level[ 'email' ])
+                                        self.make_conversation(list_ofmessage2, self.email, row_level1['email'],
+                                                               row_same_level['email'], row_same_level['email'],
+                                                               row_same_level['email'])
                                         self.list_ofmessage_processed.extend(list_ofmessage2)
-                                        self.logger.debug('elements in list of message processed: Count '+str(count)+' row_level1 '+ str(len(self.list_ofmessage_processed))+ ' of: '+row_level1[ 'email' ]+' and '+row_same_level[ 'email' ] + ' in the object of '+self.email)
+                                        self.logger.debug('elements in list of message processed: Count ' + str(
+                                            count) + ' row_level1 ' + str(
+                                            len(self.list_ofmessage_processed)) + ' of: ' + row_level1[
+                                                              'email'] + ' and ' + row_same_level[
+                                                              'email'] + ' in the object of ' + self.email)
                                         # for m in list_ofmessage2:
                                         #     self.logger.debug('1--->'+str(m))
                                         total_chats -= 1
                                         self.max_number_of_chats -= 1
                                         if count == 0 or total_chats == 0 or self.max_number_of_chats == 0:
-                                            #nobody_know = 1
+                                            # nobody_know = 1
                                             break
                             else:
                                 nobody_know -= 1
@@ -170,12 +171,12 @@ class emailworker:
                 else:
                     return self.list_ofmessage_processed
 
-            if nobody_know == 0 and userslevel1low_with_knowledge == False and len(list_ofmessage)!=0:
+            if nobody_know == 0 and userslevel1low_with_knowledge == False and len(list_ofmessage) != 0:
                 count = len(list_ofmessage)
                 for index, row_same_level in userssamelevel.iterrows():
                     if count > 0:
-                        if (row_same_level[ 'knowledge' ] == know or row_same_level[ 'knowledge2' ] == know):
-                            if row_same_level[ 'email' ] == self.email or count==0:
+                        if (row_same_level['knowledge'] == know or row_same_level['knowledge2'] == know):
+                            if row_same_level['email'] == self.email or count == 0:
                                 continue
                             else:
                                 list_ofmessage2 = deque()
@@ -192,17 +193,20 @@ class emailworker:
                                     for i in range(0, count):
                                         list_ofmessage2.append(list_ofmessage.pop())
                                         count -= 1
-                                self.make_conversation(list_ofmessage2, self.email, row_same_level[ 'email' ], None, None,
+                                self.make_conversation(list_ofmessage2, self.email, row_same_level['email'], None, None,
                                                        None)
                                 self.list_ofmessage_processed.extend(list_ofmessage2)
                                 self.logger.debug(
-                                    'elements in list of message processed: Count '+str(count)+' row_same_level ' + str(len(self.list_ofmessage_processed))+ ' of: '+row_same_level[ 'email' ] + ' in the object of '+self.email)
+                                    'elements in list of message processed: Count ' + str(
+                                        count) + ' row_same_level ' + str(
+                                        len(self.list_ofmessage_processed)) + ' of: ' + row_same_level[
+                                        'email'] + ' in the object of ' + self.email)
                                 # for m in list_ofmessage2:
                                 #     self.logger.debug('2--->'+str(m))
                                 total_chats -= 1
                                 self.max_number_of_chats -= 1
                                 if count == 0 or total_chats == 0 or self.max_number_of_chats == 0:
-                                    #nobody_know = 1
+                                    # nobody_know = 1
                                     break
                         else:
                             nobody_know -= 1
@@ -214,18 +218,22 @@ class emailworker:
         # end if kow=knowledge
         size = len(list_ofmessage)
         if size != 0:
-            self.logger.debug('List_of Message: ' + str(size) + ' messages of ' + know + ' of: '+self.email)
+            self.logger.debug('List_of Message: ' + str(size) + ' messages of ' + know + ' of: ' + self.email)
             if lastLevel or nobody_know == 0:
                 for index, row_same_level in userssamelevel.iterrows():
                     self.logger.debug(
                         'going to new object: userssamelevel ' + str(
                             len(self.list_ofmessage_processed)) + ' nobody_know ' + str(nobody_know) + ' of: ' +
-                        row_same_level[ 'email' ] + ' in the object of ' + self.email)
-                    if not (row_same_level[ 'email' ] == self.email) and not (index<self.index):
-                        if len(list_ofmessage)>0:
-                            self.list_ofmessage_processed.extend(emailworker(allusersinfo, know, list_ofmessage, list_workers,row_same_level[ 'email' ]).processor(allusersinfo, know,index))
+                        row_same_level['email'] + ' in the object of ' + self.email)
+                    if not (row_same_level['email'] == self.email) and not (index < self.index):
+                        if len(list_ofmessage) > 0:
+                            self.list_ofmessage_processed.extend(
+                                emailworker(allusersinfo, know, list_ofmessage, list_workers,
+                                            row_same_level['email']).processor(allusersinfo, know, index))
                             self.logger.debug(
-                                'elements in list of message processed: userssamelevel ' + str(len(self.list_ofmessage_processed))+' nobody_know '+str(nobody_know)+ ' of: '+row_same_level[ 'email' ] + ' in the object of '+self.email)
+                                'elements in list of message processed: userssamelevel ' + str(
+                                    len(self.list_ofmessage_processed)) + ' nobody_know ' + str(nobody_know) + ' of: ' +
+                                row_same_level['email'] + ' in the object of ' + self.email)
                             # for m in self.list_ofmessage_processed:
                             #     module_logger.debug('3--->'+str(m))
                         else:
@@ -233,10 +241,14 @@ class emailworker:
                 return self.list_ofmessage_processed
             else:
                 for index, row_level1 in userslevel1low.iterrows():
-                    if (len(list_ofmessage) > 0 and index>=self.index):
-                        self.list_ofmessage_processed.extend(emailworker(allusersinfo, know, list_ofmessage, list_workers, row_level1[ 'email' ]).processor(allusersinfo, know,index))
+                    if (len(list_ofmessage) > 0 and index >= self.index):
+                        self.list_ofmessage_processed.extend(
+                            emailworker(allusersinfo, know, list_ofmessage, list_workers,
+                                        row_level1['email']).processor(allusersinfo, know, index))
                         self.logger.debug(
-                            'elements in list of message processed: userlevel1low ' + str(len(self.list_ofmessage_processed)) + ' of: '+row_level1[ 'email' ] + ' in the object of '+self.email)
+                            'elements in list of message processed: userlevel1low ' + str(
+                                len(self.list_ofmessage_processed)) + ' of: ' + row_level1[
+                                'email'] + ' in the object of ' + self.email)
                         # for m in self.list_ofmessage_processed:
                         #     module_logger.debug('4--->'+str(m))
                     else:
@@ -288,7 +300,7 @@ class emailworker:
                                 message.co = _co
                     else:
                         message.cc = _cc
-                    #self.logger.debug(message)
+                    # self.logger.debug(message)
         except Exception as emailworkerException:
             logging.exception("Error preparing messages for " + origen + ". Error reading data  ")
         return list_ofmessages
@@ -306,8 +318,10 @@ class emailworker:
                             format='%(asctime)s | %(levelname)s | %(name)s | %(message)s', filemode='a')
 
         self.logger = logging.getLogger("EmployeeEmailworker.emailworker")
-        self.logger.debug('Starting emailWorker logger using v.' + str(__version__)+ ' System ' + sys.platform +' Version ' + sys.version )
-        return  self.logger
+        self.logger.debug('Starting emailWorker logger using v.' + str(
+            __version__) + ' System ' + sys.platform + ' Version ' + sys.version)
+        return self.logger
+
 
 users_file = "../input/users.csv"
 books_directory = '../input/books/'
@@ -333,13 +347,13 @@ def read_users_info(users_file=users_file):
 
 def read_knowlege_info(paragraphs_by_html, books_directory=books_directory, knowledge_file=knowledge_file):
     # books readed
-    books = [ ]
+    books = []
 
     # kind of knowledges
-    _knowledge = [ ]
+    _knowledge = []
 
     # dictionary knowledge->books associated.
-    _knowledge_books: List[ Dict[ str, Any ] ] = [ ]
+    _knowledge_books: List[Dict[str, Any]] = []
 
     real_books_directory = os.path.abspath(books_directory)
     if not os.path.exists(real_books_directory):
@@ -350,21 +364,20 @@ def read_knowlege_info(paragraphs_by_html, books_directory=books_directory, know
         next(reader)  # Skip header row
         for knowledge1, books in reader:
             books_list_file = books.split('|')
-            books_list: List[ Dict[ str, Any ] ] = [ ]
+            books_list: List[Dict[str, Any]] = []
             for book_file in books_list_file:
                 try:
-                    epubbook = EbookProcess.ebook(real_books_directory + "/" + book_file)
-                    htmls: List[ object ] = epubbook.create_multiple_htmls(paragraphs_by_html)
-                    book_html: Dict[ str, Any ] = {'title': str(epubbook.title), 'htmls': htmls}
+                    epubbook = ebook_process.EbookProcess(real_books_directory + "/" + book_file)
+                    htmls: List[object] = epubbook.create_multiple_htmls(paragraphs_by_html)
+                    book_html: Dict[str, Any] = {'title': str(epubbook.title), 'htmls': htmls}
                     books_list.append(book_html)
                 except Exception as BookException:
                     logging.exception("Error reading " + real_books_directory + "/" + book_file)
 
-            info: Dict[ str, Any ] = {'knowledge': knowledge1, 'books': books_list}
+            info: Dict[str, Any] = {'knowledge': knowledge1, 'books': books_list}
             _knowledge_books.append(info)
             books_list = None
     return _knowledge_books
-
 
 # list_ofmessage_proceesd = [ ]
 # usersinfo = read_users_info(users_file)

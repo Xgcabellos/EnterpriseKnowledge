@@ -4,8 +4,8 @@ from logging import getLogger
 
 from neo4j.v1 import GraphDatabase
 
-from TextProcess import active_log
-from TextProcess import log_level_conversor
+from text_process import active_log
+from text_process import log_level_conversor
 
 _author__ = 'Xavier Garcia Cabellos'
 __date__ = '20190701'
@@ -17,20 +17,20 @@ config_name = '../input/config.ini'
 config = configparser.ConfigParser()
 config.read(config_name)
 
-log_name = config[ 'LOGS' ][ 'LOG_FILE' ]
-log_directory = config[ 'LOGS' ][ 'LOG_DIRECTORY' ]
-log_level = log_level_conversor(config[ 'LOGS' ][ 'log_level_analytic_graph' ])
+log_name = config['LOGS']['LOG_FILE']
+log_directory = config['LOGS']['LOG_DIRECTORY']
+log_level = log_level_conversor(config['LOGS']['log_level_analytic_graph'])
 
 module_logger = getLogger('GraphAnalyticNeo4j')
 
 
-class neo4j_graph_analytic():
+class Neo4jGhaphAnalytic():
     def __init__(self, driver, log_file, log_level, log_directory):
         self.driver = driver
         active_log(log_file, log_level, log_directory)
-        self.logger = getLogger("neo4j_graph_analytic")
+        self.logger = getLogger("Neo4jGhaphAnalytic")
         log = getLogger("neo4j.bolt")
-        log.setLevel(log_level_conversor(config[ 'LOGS' ][ 'log_level_neo4j' ]))
+        log.setLevel(log_level_conversor(config['LOGS']['log_level_neo4j']))
         self.open_db = True
 
     def analytic_type(self):
@@ -41,7 +41,7 @@ class neo4j_graph_analytic():
         self.driver = GraphDatabase.driver(url, auth=(login, pw))
         self.self.open_db = True
         active_log(log_name, log_level, log_directory)
-        self.logger = getLogger("neo4j_graph_analytic")
+        self.logger = getLogger("Neo4jGhaphAnalytic")
         return self.driver
 
     def __del__(self):
@@ -80,8 +80,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('page_rank_centrality:  nodes: {}, iterations: {} , loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'iterations' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'dampingFactor' ], records[ 'write' ], records[ 'writeProperty' ]))
+                records['nodes'], records['iterations'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['dampingFactor'], records['write'], records['writeProperty']))
 
     def page_rank_centrality_w(self, tx):
         """PageRank is an algorithm that measures the transitive influence or connectivity of nodes.
@@ -116,8 +116,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('page_rank_centrality_w:  nodes: {}, iterations: {} , loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'iterations' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'dampingFactor' ], records[ 'write' ], records[ 'writeProperty' ]))
+                records['nodes'], records['iterations'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['dampingFactor'], records['write'], records['writeProperty']))
 
     def page_rank_centrality_personalized(self, tx):
         """
@@ -150,8 +150,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('articleRank_centrality:  nodes: {}, iterations: {} , loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'iterations' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'dampingFactor' ], records[ 'write' ], records[ 'writeProperty' ]))
+                records['nodes'], records['iterations'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['dampingFactor'], records['write'], records['writeProperty']))
 
     def Article_rank_centrality_w(self, tx):
         """
@@ -174,8 +174,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('articleRank_centrality_w:  nodes: {}, iterations: {} , loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'iterations' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'dampingFactor' ], records[ 'write' ], records[ 'writeProperty' ]))
+                records['nodes'], records['iterations'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['dampingFactor'], records['write'], records['writeProperty']))
 
     def betweenness_centrality(self, tx):
         """
@@ -215,9 +215,9 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('betweenness_out:  nodes: {},  loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'minCentrality' ], records[ 'maxCentrality' ],
-                records[ 'sumCentrality' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['minCentrality'], records['maxCentrality'],
+                records['sumCentrality']))
 
         send_text2 = "CALL algo.betweenness.sampled('User','SEND', {writeProperty:'betweenness_in', write:true," \
                      " direction: 'in'}) YIELD nodes, loadMillis, computeMillis, writeMillis, " \
@@ -226,9 +226,9 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text2):
             self.logger.info('betweenness_in:  nodes: {},  loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'minCentrality' ], records[ 'maxCentrality' ],
-                records[ 'sumCentrality' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['minCentrality'], records['maxCentrality'],
+                records['sumCentrality']))
 
         send_text3 = "CALL algo.betweenness.sampled('User','SEND', {writeProperty:'betweenness', write:true," \
                      " direction: 'BOTH'}) YIELD nodes, loadMillis, computeMillis, writeMillis, " \
@@ -237,9 +237,9 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text3):
             self.logger.info('betweenness_both:  nodes: {},  loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'minCentrality' ], records[ 'maxCentrality' ],
-                records[ 'sumCentrality' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['minCentrality'], records['maxCentrality'],
+                records['sumCentrality']))
 
     def betweenness_RA_centrality(self, tx):
         """
@@ -278,9 +278,9 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('betweenness_ra_brandes_out:  nodes: {},  loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'minCentrality' ], records[ 'maxCentrality' ],
-                records[ 'sumCentrality' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['minCentrality'], records['maxCentrality'],
+                records['sumCentrality']))
 
         send_text2 = "CALL algo.betweenness.sampled('User','SEND', {strategy:'random', probability:1.0," \
                      " direction:'in',writeProperty:'betweenness_ra_in', write:true}) " \
@@ -290,9 +290,9 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text2):
             self.logger.info('betweenness_ra_brandes_in:  nodes: {},  loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'minCentrality' ], records[ 'maxCentrality' ],
-                records[ 'sumCentrality' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['minCentrality'], records['maxCentrality'],
+                records['sumCentrality']))
 
         send_text3 = "CALL algo.betweenness.sampled('User','SEND', {strategy:'random', probability:1.0," \
                      " direction:'BOTH',writeProperty:'betweenness_ra', write:true}) " \
@@ -302,9 +302,9 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text3):
             self.logger.info('betweenness_ra_brandes_both:  nodes: {},  loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}, dampingFactor: {}, write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'minCentrality' ], records[ 'maxCentrality' ],
-                records[ 'sumCentrality' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['minCentrality'], records['maxCentrality'],
+                records['sumCentrality']))
 
     def closeness_centrality(self, tx):
         """
@@ -336,7 +336,7 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('closeness:  nodes: {}, loadMillis {}, '
                              'computeMillis: {}, writeMillis: {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ], records[ 'writeMillis' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'], records['writeMillis']))
 
     def closeness_harmonic_centrality(self, tx):
         """
@@ -361,7 +361,7 @@ class neo4j_graph_analytic():
 
         for records in tx.run(send_text):
             self.logger.info('closenessHarmonic:  nodes: {}, loadMillis {}, computeMillis: {}, writeMillis: {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ], records[ 'writeMillis' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'], records['writeMillis']))
 
     def eigenvector_centrality(self, tx):
         """
@@ -380,8 +380,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('eigenvector_:  nodes: {},  loadMillis {}, computeMillis: {}, '
                              'writeMillis: {},   writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'writeProperty' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['writeProperty']))
 
     def eigenvector_centrality_w(self, tx):
         """
@@ -400,8 +400,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('eigenvector_w_:  nodes: {},  loadMillis {}, computeMillis: {}, '
                              'writeMillis: {},   writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'writeProperty' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['writeProperty']))
 
     def degree_centrality(self, tx):
         """
@@ -430,8 +430,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('degree_followers:  nodes: {},  loadMillis {}, computeMillis: {}, '
                              'writeMillis: {},  write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'write' ], records[ 'writeProperty' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['write'], records['writeProperty']))
 
         send_text2 = "CALL algo.degree('User','SEND',  {direction: 'outgoing', writeProperty: 'followings'}) " \
                      " YIELD nodes, loadMillis, computeMillis, writeMillis, write, writeProperty "
@@ -439,8 +439,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text2):
             self.logger.info('degree_followings:  nodes: {},  loadMillis {}, computeMillis: {}, '
                              'writeMillis: {},  write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'write' ], records[ 'writeProperty' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['write'], records['writeProperty']))
 
     def degree_centrality_w(self, tx):
         """
@@ -470,8 +470,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('degree_followers_w:  nodes: {},  loadMillis {}, computeMillis: {}, '
                              'writeMillis: {},  write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'write' ], records[ 'writeProperty' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['write'], records['writeProperty']))
 
         send_text2 = "CALL algo.degree('User','SEND',  {direction: 'outgoing', writeProperty: 'weightedfollowings', " \
                      "weightProperty: 'weight'}) " \
@@ -480,8 +480,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text2):
             self.logger.info('degree_followings_w:  nodes: {},  loadMillis {}, computeMillis: {}, '
                              'writeMillis: {},  write {}, writeProperty {}'.format(
-                records[ 'nodes' ], records[ 'loadMillis' ], records[ 'computeMillis' ],
-                records[ 'writeMillis' ], records[ 'write' ], records[ 'writeProperty' ]))
+                records['nodes'], records['loadMillis'], records['computeMillis'],
+                records['writeMillis'], records['write'], records['writeProperty']))
 
     def louvain_community(self, tx):
         """
@@ -505,8 +505,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('Louvain community:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis']))
 
     def hierarchical_louvain_community(self, tx):
         """
@@ -531,8 +531,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('Hierarchical Louvain community:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis']))
 
     def louvain_community_w(self, tx):
         """
@@ -556,8 +556,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('Louvain community:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis']))
 
     def hierarchical_louvain_community_w(self, tx):
         """
@@ -582,8 +582,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('Hierarchical Louvain community:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis']))
 
     def label_propagation_segmentation_w(self, tx):
         """
@@ -608,8 +608,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('Label Propagation out_w:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}, didConverge {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ], records[ 'didConverge' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis'], records['didConverge']))
 
         send_text2 = "CALL algo.labelPropagation('User', 'SEND',{iterations:10, " \
                      "writeProperty:'weightedpartition_incoming', " \
@@ -619,8 +619,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text2):
             self.logger.info('Label Propagation in_w:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}, didConverge {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ], records[ 'didConverge' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis'], records['didConverge']))
 
         send_text3 = "CALL algo.labelPropagation('User', 'SEND',{iterations:10, " \
                      "writeProperty:'weightedpartition_both', " \
@@ -630,8 +630,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text3):
             self.logger.info('Label Propagation both_w:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}, didConverge {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ], records[ 'didConverge' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis'], records['didConverge']))
 
     def label_propagation_segmentation(self, tx):
         """
@@ -655,8 +655,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('Label Propagation out:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}, didConverge {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ], records[ 'didConverge' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis'], records['didConverge']))
 
         send_text2 = "CALL algo.labelPropagation('User', 'SEND',{iterations:10, writeProperty:'partition_incoming', " \
                      "write:true, direction: 'INCOMING'}) YIELD nodes, iterations, " \
@@ -665,8 +665,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text2):
             self.logger.info('Label Propagation in:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}, didConverge {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ], records[ 'didConverge' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis'], records['didConverge']))
 
         send_text3 = "CALL algo.labelPropagation('User', 'SEND',{iterations:10, writeProperty:'partition_both', " \
                      "write:true, direction: 'BOTH'}) YIELD nodes, iterations, " \
@@ -675,8 +675,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text3):
             self.logger.info('Label Propagation both:  nodes: {}, communityCount: {}, iterations: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}, didConverge {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'iterations' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ], records[ 'didConverge' ]))
+                records['nodes'], records['communityCount'], records['iterations'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis'], records['didConverge']))
 
     def connected_components_w(self, tx):
         """
@@ -697,8 +697,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('unionFind_w:  nodes: {}, communityCount: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}, writeProperty: {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ], records[ 'writeProperty' ]))
+                records['nodes'], records['communityCount'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis'], records['writeProperty']))
 
     def connected_components(self, tx):
         """
@@ -719,8 +719,8 @@ class neo4j_graph_analytic():
         for records in tx.run(send_text):
             self.logger.info('unionFind:  nodes: {}, communityCount: {}, '
                              'loadMillis {}, computeMillis: {}, writeMillis: {}, writeProperty: {}'.format(
-                records[ 'nodes' ], records[ 'communityCount' ], records[ 'loadMillis' ],
-                records[ 'computeMillis' ], records[ 'writeMillis' ], records[ 'writeProperty' ]))
+                records['nodes'], records['communityCount'], records['loadMillis'],
+                records['computeMillis'], records['writeMillis'], records['writeProperty']))
 
     # FALTAN!!!!
 
@@ -730,7 +730,7 @@ class neo4j_graph_analytic():
         create the ranks needed for centrality, community and similarity
         """
 
-        GRAPHDDBB_SERVER = config[ 'CONNECTION' ][ 'GRAPHDDBB_SERVER' ]
+        GRAPHDDBB_SERVER = config['CONNECTION']['GRAPHDDBB_SERVER']
 
         if self.driver is None:  # or self.open_db!=True
             self.logger.error('the connection to neo4j {} is unable'.format(GRAPHDDBB_SERVER))
@@ -904,15 +904,15 @@ def main():
         'Starting neo4j graph analytic  v.' + str(__version__) + '  ' + __description__ + '  by  ' + _author__)
 
     driver = None
-    GRAPHDDBB_SERVER = config[ 'CONNECTION' ][ 'GRAPHDDBB_SERVER' ]
+    GRAPHDDBB_SERVER = config['CONNECTION']['GRAPHDDBB_SERVER']
     try:
         driver = GraphDatabase.driver("bolt://" + GRAPHDDBB_SERVER + ":7687",
-                                      auth=(config[ 'CONNECTION' ][ 'GRAPHDDBB_LOGIN' ],
-                                            config[ 'CONNECTION' ][ 'GRAPHDDBB_PASSWORD' ]))
+                                      auth=(config['CONNECTION']['GRAPHDDBB_LOGIN'],
+                                            config['CONNECTION']['GRAPHDDBB_PASSWORD']))
     except Exception as bErr:
         module_logger.error('Error connecting GraphDatabase: %s', bErr)
 
-    graph = neo4j_graph_analytic(driver, log_name, log_level, log_directory)
+    graph = Neo4jGhaphAnalytic(driver, log_name, log_level, log_directory)
     graph.analysis()
 
 

@@ -7,7 +7,7 @@ setup(
     url='https://github.com/Xgcabellos/EKnowledge.git',
     license='Copyright Xavier Garcia Cabellos & Alvaro Roman',
     author='xgarcia',
-    author_email='xgcabellos@gmail.com',
+    author_email='xgcabellos@Gmail.com',
     description='Email interpreter as internal relationship of the company ', install_requires=['psutil', 'inflect',
                                                                                                 'nltk', 'neo4j',
                                                                                                 'vaderSentiment']

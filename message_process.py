@@ -3,8 +3,8 @@ import json
 import logging
 from logging import Logger
 
-from EmailProcessor import active_log
-from TextProcess import log_level_conversor, text_process
+from email_processor import active_log
+from text_process import log_level_conversor, TextProcess
 
 _author__ = 'Xavier Garcia Cabellos'
 __date__ = '2019601'
@@ -17,20 +17,20 @@ config = configparser.ConfigParser()
 config.read(config_name)
 
 module_logger = logging.getLogger('TextProcess')
-log_name = config[ 'LOGS' ][ 'LOG_FILE' ]
-log_directory = config[ 'LOGS' ][ 'LOG_DIRECTORY' ]
-log_level_text = log_level_conversor(config[ 'LOGS' ][ 'log_level_text' ])
+log_name = config['LOGS']['LOG_FILE']
+log_directory = config['LOGS']['LOG_DIRECTORY']
+log_level_text = log_level_conversor(config['LOGS']['log_level_text'])
 
 
-class message_process:
+class MessageProcess:
     # tags for clena html
     text = None
     thread_index = ''
 
     def __init__(self, log_file=log_name, log_level=log_level_text, log_directory=log_directory):
         active_log(log_file, log_level, log_directory)
-        self.logger: Logger = logging.getLogger("MessageProcess.message_process")
-        self.text = text_process()
+        self.logger: Logger = logging.getLogger("MessageProcess.MessageProcess")
+        self.text = TextProcess()
 
     def __del__(self):
         self.text = None
@@ -43,7 +43,7 @@ class message_process:
         self.text.clean_json_message(json_message)
         self.document_processed.clear()
         if 'Thread-Index' in json_message:
-            self.thread_index = json_message[ 'Thread-Index' ]
+            self.thread_index = json_message['Thread-Index']
         return json_message
 
 
@@ -52,10 +52,10 @@ def main():
 
     with open(json_directory + 'xgarcia.tuitravel-ad.net.200.INBOX.json', 'r') as f:
         data = json.load(f)
-    json_list = [ ]
+    json_list = []
 
     for doc in data:
-        proc = text_process(False)  # not visialization of replies
+        proc = TextProcess(False)  # not visialization of replies
         print("#################################################")
         proc.clean_json_message(doc)
 
@@ -71,7 +71,7 @@ def main():
             #   print('hidden------------------------------------------------------------------------')
         print('-------------------------------------------------------------------------------------------')
         if number_of_seen == 0:
-            print(doc[ 'parts' ][ 0 ][ 'content' ])
+            print(doc['parts'][0]['content'])
             print('-------------------------------------------------------------------------------------------')
         proc = None
 

@@ -2,19 +2,19 @@
 
 import logging
 import os
-import pypff
 import quopri
 import time
 from collections import Counter
 from email.parser import HeaderParser
 
 import jinja2
+import pypff
 import unicodecsv as csv
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
 
-import EmailProcess
-from JsonStorageEmail import json_storage_email
+import email_process
+from json_storage_email import JsonStorageEmail
 
 __author__ = 'Xavier Garcia Cabellos'
 __date__ = '20180101'
@@ -28,7 +28,7 @@ date_list = [date_dict.copy() for x in xrange(7)]
 
 
 # date_list = [date_dict.copy() for x in xrange(7)]
-class pst_file(EmailProcess.abstract_email):
+class PstFile(email_process.AbstractEmail):
     """ Class for read email from google Mapi"""
 
     folder_list = []
@@ -58,16 +58,14 @@ class pst_file(EmailProcess.abstract_email):
 
         if not os.path.exists(self.output_directory):
             os.makedirs(self.output_directory)
-        self.active_log('pst_process0r.log',logging.INFO,log_directory)
-
-
+        self.active_log('pst_process0r.log', logging.INFO, log_directory)
 
         logging.debug("Opening PST for processing...")
         self.pst_name = os.path.split(pst_file)[1]
         self.report_name = report_name
         self.opst = pypff.open(pst_file)
         self.root = self.opst.get_root_folder()
-        self.json_store = json_storage_email(None)
+        self.json_store = JsonStorageEmail(None)
         self.json_directory = os.path.abspath('./json')
 
     def __del__(self):
@@ -123,7 +121,6 @@ class pst_file(EmailProcess.abstract_email):
         """
         json_msg = {'parts': []}
         for (k, v) in msg.items():
-
             json_msg[k] = v  # .decode('utf-8', 'ignore')
 
             # The To, Cc, and Bcc fields, if present, could have multiple items.
@@ -229,7 +226,6 @@ class pst_file(EmailProcess.abstract_email):
         for message in folder.sub_messages:
             message_dict = self.processMessage(message)
             if not message_dict == None:
-
                 self.message_list.append(message_dict)
                 message_list.append(message_dict)
         self.folderReport(message_list, folder.name)

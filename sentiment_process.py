@@ -87,45 +87,19 @@ def active_log(log_name=log_name, level=log_level_text, log_directory=log_direct
     logging.basicConfig(filename=log_path, level=level,
                         format='%(asctime)s | %(levelname)s | %(name)s | %(message)s', filemode='a')
 
-    logger: Logger = logging.getLogger("TextProcess.text_process")
-    # self.logger.debug('Starting text_process logger using v.' + str(__version__) + ' System ' + sys.platform)
+    logger: Logger = logging.getLogger("SentimentProcess.SentimentProcess")
+    # self.logger.debug('Starting TextProcess logger using v.' + str(__version__) + ' System ' + sys.platform)
     return logger
 
 
-class text_process:
-    # tags for clena html
-    VALID_TAGS = ['body', 'div', 'em', 'p', 'ul', 'li', 'br']
-    # clean for clean paragrphs
-    TEXT_TAGS = ['div', 'p', 'ul', 'ol', 'dl']
-    # for clean the footer. it depend of the lengague and should be manage by locate.
-    SIG_REGEX = re.compile(r'(--|__|-\w)|(^Sent from my (\w+\s*){1,3})|(^Enviado desde mi (\w+\s*){1,3})')
-    QUOTE_HDR_REGEX = re.compile('On.*wrote:$')
-    # clean emails old fasion with > for reply.
-    QUOTED_REGEX = re.compile(r'(^>+)', re.DOTALL | re.MULTILINE)
-    # for locate the start of reply.
-    HEADER_REGEX = re.compile(r'(From|Sent|To|Subject): .+')
-    _MULTI_QUOTE_HDR_REGEX = r'(?!On.*On\s.+?wrote:)(On\s(.+?)wrote:)'
-    MULTI_QUOTE_HDR_REGEX = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL | re.MULTILINE)
-    MULTI_QUOTE_HDR_REGEX_MULTILINE = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL)
-    document_processed = []
-    text = ''
-    fragments = []
-    # frament is type Paragraph. Get paragraps analysed.
-    fragment = None
-    # this variable help me to hidden all paragrphs after header, sig or quoted
-    found_visible = True
-    # this value let mark as hidden or not all after some type of paragrphs. as Quoted, Sig, Header....
-    reply_visble = False
-    json_doc = None
+class sentimentProcess:
     title = ""  # for subject
     textId = ""  # For message_id
     writer = ""  # for from email use to have the name and it can be used by signature.
 
     def __init__(self, reply_visible=False, log_file=log_name, log_level=log_level_text, log_directory=log_directory):
         active_log(log_file, log_level, log_directory)
-        self.logger = logging.getLogger("TextProcess.text_process")
-        self.found_visible = True
-        self.reply_visble = reply_visible
+        self.logger = logging.getLogger("TextProcess.TextProcess")
 
     def __del__(self):
         self.document_processed.clear()
@@ -135,7 +109,7 @@ class text_process:
 
     def process_type(self):
         """"Return a string representing the type of processor this is."""
-        return 'text'
+        return 'sentiment'
 
     def clean_json_message(self, json_message):
         self.json_doc = json_message

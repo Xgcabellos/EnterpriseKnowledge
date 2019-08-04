@@ -1,9 +1,10 @@
 import configparser
 import json
 import logging
-import os
 import re
 import unicodedata
+import warnings
+from collections import defaultdict
 from logging import Logger
 
 import contractions
@@ -14,6 +15,26 @@ from bs4 import Comment
 # from email_reply_parser import EmailReplyParser
 from htmllaundry import sanitize
 from nltk.corpus import stopwords
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+# nltk.download()
+
+# Plotting tools
+import matplotlib.pyplot as plt
+
+plt.style.use('fivethirtyeight')
+# %matplotlib  inline
+import os
+# Set Pandas to display all rows of dataframes
+
+# nltk
+from nltk import tokenize, wordpunct_tokenize
+import pandas as pd
+from nltk import word_tokenize
+
+pd.set_option('display.max_rows', 500)
 
 _author__ = 'Xavier Garcia Cabellos'
 __date__ = '2019601'
@@ -26,6 +47,7 @@ __description__ = 'This scripts read text and html and break it in different ele
 
 # noinspection PyCompatibility
 config_name = '../input/config.ini'
+json_directory = './json/'
 
 
 def log_level_conversor(level):
@@ -49,9 +71,9 @@ config = configparser.ConfigParser()
 config.read(config_name)
 
 module_logger = logging.getLogger('TextProcess')
-log_name = config[ 'LOGS' ][ 'LOG_FILE' ]
-log_directory = config[ 'LOGS' ][ 'LOG_DIRECTORY' ]
-log_level_text = log_level_conversor(config[ 'LOGS' ][ 'log_level_text' ])
+log_name = config['LOGS']['LOG_FILE']
+log_directory = config['LOGS']['LOG_DIRECTORY']
+log_level_text = log_level_conversor(config['LOGS']['log_level_text'])
 
 
 def active_log(log_name=log_name, level=log_level_text, log_directory=log_directory):
@@ -72,9 +94,9 @@ def active_log(log_name=log_name, level=log_level_text, log_directory=log_direct
 
 class text_process:
     # tags for clena html
-    VALID_TAGS = [  'body', 'div', 'em', 'p', 'ul', 'li', 'br' ]
+    VALID_TAGS = ['body', 'div', 'em', 'p', 'ul', 'li', 'br']
     # clean for clean paragrphs
-    TEXT_TAGS = [ 'div', 'p', 'ul', 'ol', 'dl' ]
+    TEXT_TAGS = ['div', 'p', 'ul', 'ol', 'dl']
     # for clean the footer. it depend of the lengague and should be manage by locate.
     SIG_REGEX = re.compile(r'(--|__|-\w)|(^Sent from my (\w+\s*){1,3})|(^Enviado desde mi (\w+\s*){1,3})')
     QUOTE_HDR_REGEX = re.compile('On.*wrote:$')
@@ -85,15 +107,19 @@ class text_process:
     _MULTI_QUOTE_HDR_REGEX = r'(?!On.*On\s.+?wrote:)(On\s(.+?)wrote:)'
     MULTI_QUOTE_HDR_REGEX = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL | re.MULTILINE)
     MULTI_QUOTE_HDR_REGEX_MULTILINE = re.compile(_MULTI_QUOTE_HDR_REGEX, re.DOTALL)
-    document_processed = [ ]
+    document_processed = []
     text = ''
-    fragments = [ ]
+    fragments = []
     # frament is type Paragraph. Get paragraps analysed.
     fragment = None
     # this variable help me to hidden all paragrphs after header, sig or quoted
     found_visible = True
     # this value let mark as hidden or not all after some type of paragrphs. as Quoted, Sig, Header....
     reply_visble = False
+    json_doc = None
+    title = ""  # for subject
+    textId = ""  # For message_id
+    writer = ""  # for from email use to have the name and it can be used by signature.
 
     def __init__(self, reply_visible=False, log_file=log_name, log_level=log_level_text, log_directory=log_directory):
         active_log(log_file, log_level, log_directory)
@@ -112,19 +138,30 @@ class text_process:
         return 'text'
 
     def clean_json_message(self, json_message):
+        self.json_doc = json_message
+        if "Subject" in json_message:
+            self.title = json_message["Subject"]
+        if "Message-Id" in json_message:
+            self.textId = json_message["Message-Id"]
+        elif "Message-ID" in json_message:
+            self.textId = json_message["Message-ID"]
+        else:
+            raise Exception(
+                " Fatal Error. the message-ID or Message-Id of {}  doesn't exist. It doesn't SHOULD happened".format(
+                    self.title))
+        self.writer = json_message["From"]
 
-        self.document_processed.clear()
-        for message in json_message[ 'parts' ]:
-            if message[ 'contentType' ] == 'text/html':
-                #message[ 'content' ] = sanitize(self.clean_html(message[ 'content' ]))
-                clean_text0=self.prepare_paragraphs(message[ 'content' ])
-                clean_text1=self.clean_html(clean_text0)
-                clean_text2=sanitize(clean_text1)
-                message[ 'content' ] = clean_text2
-                soup = BeautifulSoup(message[ 'content' ], 'lxml')
+        self.document_processed = []
+        self.fragments = []
+        for message in json_message['parts']:
+            if message['contentType'] == 'text/html':
+                # message[ 'content' ] = sanitize(self.clean_html(message[ 'content' ]))
+                clean_text0 = self.prepare_paragraphs(message['content'])
+                clean_text1 = self.clean_html(clean_text0)
+                clean_text2 = sanitize(clean_text1)
+                message['content'] = clean_text2
+                soup = BeautifulSoup(message['content'], 'lxml')
                 paraphs = soup.find_all(self.TEXT_TAGS)
-
-
 
                 for p in paraphs:
                     text = p.getText().rstrip()
@@ -132,9 +169,9 @@ class text_process:
                         self.scan_paraph(text)
                         self._finish_fragment()
                         self.document_processed.append(text)
-            elif message[ 'contentType' ] == 'text/plain':
-                paraphs = self.split_paragraphs(message[ 'content' ])
-                paraphs_list = [ ]
+            elif message['contentType'] == 'text/plain':
+                paraphs = self.split_paragraphs(message['content'])
+                paraphs_list = []
                 for p in paraphs:
                     text = p
                     if text != '':
@@ -208,7 +245,7 @@ class text_process:
 
             Returns True or False
         """
-        return self.QUOTE_HDR_REGEX.match(line[ ::-1 ]) is not None
+        return self.QUOTE_HDR_REGEX.match(line[::-1]) is not None
 
     def _finish_fragment(self):
         """ Creates fragment
@@ -246,8 +283,8 @@ class text_process:
     #
     @staticmethod
     def clean_email(text):
-        #return text.replace('---','\n---').replace('__','\n__').replace('From: ','\nFrom:')
-        #return text.replace('---','\n\t\t\t---').replace('__','\n\t\t\t__')
+        # return text.replace('---','\n---').replace('__','\n__').replace('From: ','\nFrom:')
+        # return text.replace('---','\n\t\t\t---').replace('__','\n\t\t\t__')
         return text.replace('/(^\w.+:\n)?(^>.*(\n|$))+/mi', '')
 
     @staticmethod
@@ -260,9 +297,9 @@ class text_process:
     def prepare_paragraphs(text):
         ######################3
         # Be careful, it make nothing. just only useful for include cleaning functions.
-        #return (text)
-        text_out=text.replace('-----Original Appointment-----' , '</p><p>-----Original Appointment-----').\
-            replace('From:' , '<\p><p>From:')
+        # return (text)
+        text_out = text.replace('-----Original Appointment-----', '</p><p>-----Original Appointment-----'). \
+            replace('From:', '<\p><p>From:')
 
         return text_out
 
@@ -295,7 +332,7 @@ class text_process:
                 tag.extract()
 
         text_out = " ".join(soup.prettify().split())
-        #text_out = soup.prettify()
+        # text_out = soup.prettify()
         return text_out
 
     @staticmethod
@@ -316,7 +353,7 @@ class text_process:
     @staticmethod
     def remove_non_ascii(words):
         """Remove non-ASCII characters from list of tokenized words"""
-        new_words = [ ]
+        new_words = []
         for word in words:
             new_word = unicodedata.normalize('NFKD', word).encode('ascii', 'ignore').decode('utf-8', 'ignore')
             new_words.append(new_word)
@@ -325,7 +362,7 @@ class text_process:
     @staticmethod
     def to_lowercase(words):
         """Convert all characters to lowercase from list of tokenized words"""
-        new_words = [ ]
+        new_words = []
         for word in words:
             new_word = word.lower()
             new_words.append(new_word)
@@ -334,7 +371,7 @@ class text_process:
     @staticmethod
     def remove_punctuation(words):
         """Remove punctuation from list of tokenized words"""
-        new_words = [ ]
+        new_words = []
         for word in words:
             new_word = re.sub(r'[^\w\s]', '', word)
             if new_word != '':
@@ -345,7 +382,7 @@ class text_process:
     def replace_numbers(words):
         """Replace all interger occurrences in list of tokenized words with textual representation"""
         p = inflect.engine()
-        new_words = [ ]
+        new_words = []
         for word in words:
             if word.isdigit():
                 new_word = p.number_to_words(word)
@@ -357,7 +394,7 @@ class text_process:
     @staticmethod
     def remove_stopwords(words):
         """Remove stop words from list of tokenized words"""
-        new_words = [ ]
+        new_words = []
         for word in words:
             if word not in stopwords.words('english'):
                 new_words.append(word)
@@ -367,7 +404,7 @@ class text_process:
     def stem_words(words):
         """Stem words in list of tokenized words"""
         stemmer = nltk.LancasterStemmer()
-        stems = [ ]
+        stems = []
         for word in words:
             stem = stemmer.stem(word)
             stems.append(stem)
@@ -377,7 +414,7 @@ class text_process:
     def lemmatize_verbs(words):
         """Lemmatize verbs in list of tokenized words"""
         lemmatizer = nltk.WordNetLemmatizer()
-        lemmas = [ ]
+        lemmas = []
         for word in words:
             lemma = lemmatizer.lemmatize(word, pos='v')
             lemmas.append(lemma)
@@ -408,7 +445,7 @@ class Paragraph(object):
             self.hidden = hidden
         self.quoted = quoted
         self._content = None
-        self.lines = [ first_line ]
+        self.lines = [first_line]
 
     def finish(self):
         """ Creates block of content with lines
@@ -423,272 +460,302 @@ class Paragraph(object):
         return self._content.strip()
 
 
+def compute_ratios(text):
+    tokens = wordpunct_tokenize(text)
+    words = [word.lower() for word in tokens]
+
+    langratios = {}
+
+    for language in stopwords.fileids():
+        stopwords_set = set(stopwords.words(language))
+        words_set = set(words)
+        common_elements = words_set.intersection(stopwords_set)
+        langratios[language] = len(common_elements)
+
+    return langratios
+
+
+def detect_language(text):
+    # it seen more precise than the other. but just only in long test.  better than small ones
+    ratios = compute_ratios(text)
+
+    mostLang = max(ratios, key=ratios.get)
+    return mostLang
+
+
+import spacy
+from spacy_langdetect import LanguageDetector
+
+
+def detect_language_spacy(text):
+    # aprox 60 times slower
+
+    nlp = spacy.load("en")
+    nlp.add_pipe(LanguageDetector(), name="language_detector", last=True)
+    doc = nlp(text)
+
+    # document level language detection. Think of it like average language of document!
+    # print(doc._.language['language'])
+    # sentence level language detection
+    # for i, sent in enumerate(doc.sents):
+    #    print(sent, sent._.language)
+    return doc._.language
+
+
+filepath = ('data/'
+            'NRC-Sentiment-Emotion-Lexicons/'
+            'NRC-Emotion-Lexicon-v0.92/'
+            'NRC-Emotion-Lexicon-Wordlevel-v0.92.txt')
+emolex_df = pd.read_csv(filepath,
+                        names=["word", "emotion", "association"],
+                        sep='\t')
+emolex_words = emolex_df.pivot(index='word',
+                               columns='emotion',
+                               values='association').reset_index()
+emotions = emolex_words.columns.drop('word')
+
+
+def text_emotion(df, column):
+    """
+    Takes a DataFrame and a specified column of text and adds 10 columns to the
+    DataFrame for each of the 10 emotions in the NRC Emotion Lexicon, with each
+    column containing the value of the text in that emotions
+    INPUT: DataFrame, string
+    OUTPUT: the original DataFrame with ten new columns
+    """
+
+    new_df = df.copy()
+
+    emo_df = pd.DataFrame(0, index=df.index, columns=emotions)
+
+    # stemmer = nltk.SnowballStemmer("english")
+
+    file = ''
+    message_Id = ''
+    language = ''
+    language2 = ''
+    for i, row in new_df.iterrows():
+
+        # if row['file'] != file:
+        #     # print(row['file'])
+        #     file = row['file']
+        if row['message_Id'] != message_Id:
+            # print('   ', row['message_Id'])
+            message_Id = row['message_Id']
+        if row['language'] != language:
+            # print('   ', row['message_Id'])
+            language = row['language']
+        if row['language2'] != language2:
+            # print('   ', row['message_Id'])
+            language2 = row['language2']
+            if language2 == 'ca':
+                language2 = 'spanish'
+            elif language2 == 'es':
+                language2 = 'spanish'
+            else:
+                language2 = 'english'
+        document = word_tokenize(new_df.loc[i][column])
+        stemmer = nltk.SnowballStemmer(language)
+        for word in document:
+            word = stemmer.stem(word.lower())
+            emo_score = emolex_words[emolex_words.word == word]
+            if not emo_score.empty:
+                for emotion in list(emotions):
+                    emo_df.at[i, emotion] += emo_score[emotion]
+
+    new_df = pd.concat([new_df, emo_df], axis=1)
+
+    return new_df
+
+
 def main():
-    # sample = """<h1>Title Goes Here</h1>
-    #     <b>Bolded Text</b>
-    #     <i>Italicized Text</i>
-    #     <img src="this should all be gone"/>
-    #     <a href="this will be gone, too">But this will still be here!</a>
-    #     I run. He ran. She is running. Will they stop running?
-    #     I talked. She was talking. They talked to them about running. Who ran to the talking runner?
-    #     [Some text we don't want to keep is in here]
-    #     ¡Sebastián, Nicolás, Alejandro and Jéronimo are going to the store tomorrow morning!
-    #     something... is! wrong() with.,; this :: sentence.
-    #     I can't do this anymore. I didn't know them. Why couldn't you have dinner at the restaurant?
-    #     My favorite movie franchises, in order: Indiana Jones; Marvel Cinematic Universe; Star Wars; Back to the Future; Harry Potter.
-    #     Don't do it.... Just don't. Billy! I know what you're doing. This is a great little house you've got here.
-    #     [This is some other unwanted text]
-    #     John: "Well, well, well."
-    #     James: "There, there. There, there."
-    #     &nbsp;&nbsp;
-    #     There are a lot of reasons not to do this. There are 101 reasons not to do it. 1000000 reasons, actually.
-    #     I have to go get 2 tutus from 2 different stores, too.
-    #     22    45   1067   445
-    #     {{Here is some stuff inside of double curly braces.}}
-    #     {Here is more stuff in single curly braces.}
-    #     [DELETE]
-    #     </body>
-    #     </html>"""
+    DEFAULT_LANGUAGE = 'english'
+    path = json_directory
 
-    #  sample = text_process.denoise_text(sample)
-    #  print(sample)
-    #  sample = text_process.replace_contractions(sample)
-    #  print(sample)
-    #  #nltk.download('punkt')
-    #  words = nltk.word_tokenize(sample)
-    #  print(words)
-    # # nltk.download('stopwords')
-    #  words = text_process.normalize(words)
-    #  print(words)
+    # Reading all files in json_directory (path)
+    json_file = []
+    # r=root, d=directories, f = files
+    number_of_files = 2
+    for r, d, f in os.walk(path):
+        for json_f in f:
+            if '.json' in json_f:
+                if number_of_files > 0:
+                    json_file.append(os.path.join(r, json_f))
+                number_of_files -= 1
 
-    json_directory = './json/'
-    json_file = 'xgarcia.tuitravel-ad.net.200.INBOX.json'
+    hp = defaultdict(dict)
+    for jfile in json_file:
+        with open(jfile, 'r') as f:
+            data = json.load(f)
+        doc_list = []
 
-    with open(json_directory + json_file, 'r') as f:
-        data = json.load(f)
-    json_list = [ ]
+        for doc in data:
+            proc = text_process(False)  # not visualization of replies
+            proc.clean_json_message(doc)
+            doc_list.append(proc)
+        module_logger.info(jfile + ' processing {} messages....'.format(str(len(doc_list))))
 
-    for doc in data:
-        proc = text_process(False)  # not visialization of replies
-        print("#################################################")
-        proc.clean_json_message(doc)
+        # write matrix with a list of paragraphs
 
-    print('-------------------------------------------------------------------------------------------')
-    number_of_seen = 0
-    for p in proc.fragments:
-        # print('-------------------------------------------------------------------------------------------')
-        if not p.hidden:
-            print(p.content)
-            # print(doc[ 'parts' ][0][ 'contentType' ])
-            number_of_seen += 1
-        # else:
-        #   print('hidden------------------------------------------------------------------------')
-    print('-------------------------------------------------------------------------------------------')
-    if number_of_seen == 0:
-        print(doc['parts'][0]['content'])
-        print('-------------------------------------------------------------------------------------------')
+        for messageInfo in doc_list:
+            number_of_seen = 0
+            list_fragments = []
+            languages = {}
+
+            for p in messageInfo.fragments:
+                if not p.hidden:
+                    number_of_seen += 1
+                    list_fragments.append(p.content)
+                    language = detect_language(p.content)
+                    if language in languages:
+                        languages[language] += 1
+                    else:
+                        languages[language] = 1
+
+            hp[jfile][messageInfo.textId] = (messageInfo.title, list_fragments, languages)
+
+    hp = dict(hp)
+
+    # The compound score is computed by summing the valence scores of each word in the lexicon, adjusted according
+    # to the rules, and then normalized to be between -1 (most extreme negative) and +1 (most extreme positive).
+    # This is the most useful metric if you want a single unidimensional measure of sentiment for a given sentence.
+    # Calling it a 'normalized, weighted composite score' is accurate.
+    # i t is also useful for researchers who would like to set standardized thresholds for classifying sentences
+    # as either positive, neutral, or negative.Typical threshold values (used in the literature cited on this page)
+    # are:
 
     #
-    # import re
-    # import pandas as pd
-    # import numpy as np
-    # from collections import defaultdict
-    # import requests
-    # # Set Pandas to display all rows of dataframes
-    # pd.set_option('display.max_rows', 500)
-    #
-    # # nltk
-    # from nltk import tokenize
-    #
-    # from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-    #
-    # # Plotting tools
-    # import matplotlib.pyplot as plt
-    # import matplotlib
-    # plt.style.use('fivethirtyeight')
-    # #%matplotlib  inline
-    #
-    # import warnings
-    # warnings.filterwarnings("ignore", category=DeprecationWarning)
-    #
-    # from tqdm import tqdm_notebook as tqdm
-    # from tqdm import trange
-    #
-    #
-    # hp = defaultdict(dict)
-    #
-    # hp[json_file]['Chapter ']  = (chap_title, chap_text)
-    # hp = dict(hp)
-    # hp["Harry Potter and the Deathly Hallows"]['Epilogue'] = hp["Harry Potter and the Deathly Hallows"].pop(
-    #     'Chapter 37')
-    #
-    # analyzer = SentimentIntensityAnalyzer()
-    #
-    # for book in tqdm(hp, desc='Progress'):
-    #     print(book)
-    #     for chapter in tqdm(hp[book], postfix=book):
-    #         #         print('  ', hp[book][chapter][0])
-    #         text = hp[book][chapter][1].replace('\n', '')
-    #         sentence_list = tokenize.sent_tokenize(text)
-    #         sentiments = {'compound': 0.0, 'neg': 0.0, 'neu': 0.0, 'pos': 0.0}
-    #
-    #         for sentence in sentence_list:
-    #             vs = analyzer.polarity_scores(sentence)
-    #             sentiments['compound'] += vs['compound']
-    #             sentiments['neg'] += vs['neg']
-    #             sentiments['neu'] += vs['neu']
-    #             sentiments['pos'] += vs['pos']
-    #
-    #         sentiments['compound'] = sentiments['compound'] / len(sentence_list)
-    #         sentiments['neg'] = sentiments['neg'] / len(sentence_list)
-    #         sentiments['neu'] = sentiments['neu'] / len(sentence_list)
-    #         sentiments['pos'] = sentiments['pos'] / len(sentence_list)
-    #
-    #         hp[book][chapter] = (hp[book][chapter][0], hp[book][chapter][1], sentiments)
-    #
-    #         compound_sentiments = [hp[book][chapter][2]['compound'] for book in hp for chapter in hp[book]]
-    #         chap = 0
-    #         for book in hp:
-    #             print(book)
-    #             book_chap = 1
-    #             for chapter in hp[book]:
-    #                 print('  Chapter', book_chap, '-', hp[book][chapter][0])
-    #                 print('     ', compound_sentiments[chap])
-    #                 book_chap += 1
-    #                 chap += 1
-    #             print()
-    #
-    #
-    #
-    #         book_indices = {}
-    #         idx = 0
-    #         for book in hp:
-    #             start = idx
-    #             for chapter in hp[book]:
-    #                 idx += 1
-    #             book_indices[book] = (start, idx)
-    #
-    #         def movingaverage(interval, window_size):
-    #             window = np.ones(int(window_size)) / float(window_size)
-    #             return np.convolve(interval, window, 'same')
-    #
-    #         length = sum([len(hp[book]) for book in hp])
-    #         x = np.linspace(0, length - 1, num=length)
-    #         y = [hp[book][chapter][2]['compound'] for book in hp for chapter in hp[book]]
-    #
-    #         plt.figure(figsize=(15, 10))
-    #         for book in book_indices:
-    #             plt.plot(x[book_indices[book][0]: book_indices[book][1]],
-    #                      y[book_indices[book][0]: book_indices[book][1]],
-    #                      label=book)
-    #         plt.plot(movingaverage(y, 10), color='k', linewidth=3, linestyle=':', label='Moving Average')
-    #         plt.axhline(y=0, xmin=0, xmax=length, alpha=.25, color='r', linestyle='--', linewidth=3)
-    #         plt.legend(loc='best', fontsize=15)
-    #         plt.title('Emotional Sentiment of the Harry Potter series', fontsize=20)
-    #         plt.xlabel('Chapter', fontsize=15)
-    #         plt.ylabel('Average Sentiment', fontsize=15)
-    #         plt.show()
-    #
-    #         length = sum([len(hp[book]) for book in hp])
-    #         x = np.linspace(0, length - 1, num=length)
-    #         y = [hp[book][chapter][2]['compound'] for book in hp for chapter in hp[book]]
-    #
-    #         plt.figure(figsize=(15, 10))
-    #         for book in book_indices:
-    #             plt.plot(x[book_indices[book][0]: book_indices[book][1]],
-    #                      y[book_indices[book][0]: book_indices[book][1]],
-    #                      label=book)
-    #         plt.plot(movingaverage(y, 10), color='k', linewidth=3, linestyle=':', label='Moving Average')
-    #         plt.axhline(y=0, xmin=0, xmax=length, alpha=.25, color='r', linestyle='--', linewidth=3)
-    #         plt.xticks(np.arange(0, 225, 25), '')
-    #         plt.yticks(np.arange(-.15, .15, .05), '')
-    #         plt.show()
-    #
-    #         sentiment_scores = [[hp[book][chapter][2][sentiment] for book in hp for chapter in hp[book]]
-    #                             for sentiment in ['compound', 'neg', 'neu', 'pos']]
-    #
-    #         compound_sentiment = sentiment_scores[0]
-    #
-    #         print('Average Book Sentiment:')
-    #         print()
-    #         for book in book_indices:
-    #             compound = compound_sentiment[book_indices[book][0]: book_indices[book][1]]
-    #             print('{:45}{:.2f}%'.format(book, 100 * sum(compound) / len(compound)))
-    #         print('{:45}{:.2f}%'.format('Across the entire series',
-    #                                     100 * sum(compound_sentiment) / len(compound_sentiment)))
-    #
-    #         length = sum([len(hp[book]) for book in hp])
-    #         x = np.linspace(0, length - 1, num=length)
-    #
-    #         plt.figure(figsize=(15, 10))
-    #         for i, sentiment in enumerate(sentiment_scores):
-    #             plt.plot(x,
-    #                      sentiment,
-    #                      label=['compound', 'neg', 'neu', 'pos'][i])
-    #         # plt.plot(movingaverage(compound_sentiments, 10)+.1, color='k', linewidth=3, linestyle=':', label = 'Moving Average')
-    #         plt.axhline(y=0, xmin=0, xmax=length, alpha=.25, color='r', linestyle='--', linewidth=3)
-    #         plt.legend(loc='best', fontsize=15)
-    #         plt.title('Chapter Sentiment of the Harry Potter series', fontsize=20)
-    #         plt.xlabel('Chapter', fontsize=15)
-    #         plt.ylabel('Average Sentiment', fontsize=15)
-    #         plt.show()
-    #
-    #         pattern = ("(C H A P T E R (?:[A-Z-][ ]){2,}[A-Z]|"
-    #                    "E P I L O G U E)\s+" +  # Group 1 selects the chapter number
-    #                    "([A-Z \n',.-]+)\\b(?![A-Z]+(?=\.)\\b)" +  # Group 2 selects the chapter title but excludes all caps word beginning first sentence of the chapter
-    #                    "(?![a-z']|[A-Z.])" +  # chapter title ends before lowercase letters or a period
-    #                    "(.*?)" +  # Group 3 selects the chapter contents
-    #                    "(?=C H A P T E R (?:[A-Z][ ]){2,}|"
-    #                    "This\s+book\s+was\s+art\s+directed\s+|"
-    #                    "E P I L O G U E)")  # chapter contents ends with a new chapter, epilogue or the end of book
-    #         hp2 = defaultdict(dict)
-    #         for book in books:
-    #             title = book[28:-4]
-    #             with open(book, 'r') as f:
-    #                 text = (f.read().replace('&rsquo;', "'")
-    #                         .replace('&lsquo;', "'")
-    #                         .replace('&rdquo;', '"')
-    #                         .replace('&ldquo;', '"')
-    #                         .replace('&mdash;', '—'))
-    #             chapters = re.findall(pattern, text, re.DOTALL)
-    #             chap = 0
-    #             for chapter in chapters:
-    #                 chap += 1
-    #                 chap_title = chapter[1].replace('\n', '')
-    #                 chap_text = chapter[2][3:]
-    #                 phrase = ' HE-WHO-MUST-NOT-BE-NAMED RETURNS'
-    #                 if phrase in chap_title:
-    #                     chap_title = chap_title.replace(phrase, '')
-    #                     chap_text = phrase[1:] + ' I' + chap_text
-    #                 chap_text = re.sub('\n*&bull; [0-9]+ &bull; \n*' + chap_title + ' \n*', '', chap_text,
-    #                                    flags=re.IGNORECASE)
-    #                 chap_text = re.sub('\n*&bull; [0-9]+ &bull;\s*(CHAPTER [A-Z-]+\s*)|(EPILOGUE)\s*', '', chap_text)
-    #                 chap_text = re.sub(' \n&bull; [0-9]+ &bull; \n*', '', chap_text)
-    #                 chap_text = re.sub('\s*'.join([word for word in chap_title.split()]), '', chap_text)
-    #                 hp2[title]['Chapter ' + str(chap)] = (chap_title, chap_text)
-    #         hp2 = dict(hp2)
-    #         hp2["Harry Potter and the Deathly Hallows"]['Epilogue'] = hp2["Harry Potter and the Deathly Hallows"].pop('Chapter 37')
-    #
-    #         for book in tqdm(hp2, desc='Progress'):
-    #             print(book)
-    #             for chapter in tqdm(hp2[book]):
-    #                 #         print('  ', hp2[book][chapter][0])
-    #                 text = hp2[book][chapter][1].replace('\n', '')
-    #                 sentence_list = tokenize.sent_tokenize(text)
-    #                 sentiments2 = {'compound': [], 'neg': [], 'neu': [], 'pos': []}
-    #
-    #                 vs = analyzer.polarity_scores(text)
-    #                 sentiments2['compound'] = vs['compound']
-    #                 sentiments2['neg'] = vs['neg']
-    #                 sentiments2['neu'] = vs['neu']
-    #                 sentiments2['pos'] = vs['pos']
-    #
-    #                 hp2[book][chapter] = (hp2[book][chapter][0], hp2[book][chapter][1], sentiments2)
-    #         #     print()
+    # positive sentiment: compound score >= 0.05
+    # neutral sentiment: (compound score > -0.05) and (compound score < 0.05)
+    # negative sentiment: compound score <= -0.05
 
+    # The pos, neu, and neg scores are ratios for proportions of text that fall in each category (so these should all
+    # add up to be 1... or close to it with float operation). These are the most useful metrics if you want
+    # multidimensional measures of sentiment for a given sentence.
+    # https://github.com/cjhutto/vaderSentiment?source=post_page---------------------------
+
+    p = None
+    # data = {'file': [], 'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
+    data = {'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
+    hp_df = None
+    analyzer = SentimentIntensityAnalyzer()
+    for json_f in hp:
+        index = 0
+        for messageId in hp[json_f]:
+            sentence_list = []
+            for p in hp[json_f][messageId][1]:
+                text = p.replace('\n', '').replace('\r', ' ')
+
+                sentence_list += tokenize.sent_tokenize(text)
+
+            sentiments = {'compound': 0.0, 'neg': 0.0, 'neu': 0.0, 'pos': 0.0}
+
+            for sentence in sentence_list:
+                vs = analyzer.polarity_scores(sentence)
+                sentiments['compound'] += vs['compound']
+                sentiments['neg'] += vs['neg']
+                sentiments['neu'] += vs['neu']
+                sentiments['pos'] += vs['pos']
+
+            if len(sentence_list):
+                sentiments['compound'] = sentiments['compound'] / len(sentence_list)
+                sentiments['neg'] = sentiments['neg'] / len(sentence_list)
+                sentiments['neu'] = sentiments['neu'] / len(sentence_list)
+                sentiments['pos'] = sentiments['pos'] / len(sentence_list)
+
+            # lang ='NONE' #
+            lang = detect_language(' '.join(sentence_list))
+            # if 'arabic' in lang:
+            #     lang= DEFAULT_LANGUAGE
+
+            lang2 = {'language': 0}
+            # lang2 = detect_language_spacy(' '.join(sentence_list))
+
+            hp[json_f][messageId] = (hp[json_f][messageId][0], hp[json_f][messageId][1],
+                                     hp[json_f][messageId][2], sentiments, lang, lang2)
+            index += 1
+            # module_logger.info('{:45} compound:{:.3f},neg:{:.3f},neu:{:.3f}, pos:{:.3f}'
+            #                    .format(hp[json_file_name][text_id][0], hp[json_file_name][text_id][3]['compound'],
+            #                            hp[json_file_name][text_id][3]['neg'],
+            #                            hp[json_file_name][text_id][3]['neu'],
+            #                            hp[json_file_name][text_id][3]['pos']))
+            # module_logger.info('{:45} compound:{:.3f}, languages: {}, main language: {}, language 2 {}'
+            # module_logger.info('{:45} compound:{:.3f}, main language: {}, language2: {}'
+            #                    .format(hp[json_f][messageId][0], hp[json_f][messageId][3]['compound'],
+            #                            # str(hp[json_file_name][message_Id][2]),
+            #                            str(hp[json_f][messageId][4]),
+            #                            str(hp[json_f][messageId][5]['language'])))
+
+            # Other way of sentiment analysis.  NRC emotion lexicon
+
+            title = hp[json_f][messageId][0]
+            #         print('   ', chapter, title)
+            text = ' '.join(hp[json_f][messageId][1]).replace('\n', '').replace('\r', ' ')
+            language = hp[json_f][messageId][4]
+            language2 = hp[json_f][messageId][5]
+            # data['file'].append(json_f)
+            data['message_Id'].append(title)
+            data['text'].append(text)
+            data['language'].append(language)
+            data['language2'].append(language2['language'])
+            data['compound'].append(hp[json_f][messageId][3]['compound'])
+
+        hp_df = pd.DataFrame(data=data)
+        hp_df = text_emotion(hp_df, 'text')
+        # index = hp_df.shape[0]
+        module_logger.info(hp_df.to_string())  # hp_df.iloc[index2, : ])
+
+        data = {'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
+        # compound_sentiments = [hp[json_file_name][text_id][3]['compound'] for json_file_name in hp
+        #                     for text_id in hp[json_file_name]]
+
+    json_file_name_indices = {}
+    idx = 0
+    for json_f in hp:
+        start = idx
+        for message_Id in hp[json_f]:
+            idx += 1
+        json_file_name_indices[json_f] = (start, idx)
+
+    sentiment_scores = [
+        [hp[json_file_name][textId][3][sentiment] for json_file_name in hp for textId in hp[json_file_name]]
+        for sentiment in ['compound', 'neg', 'neu', 'pos']]
+
+    compound_sentiment = sentiment_scores[0]
+
+    for json_f in json_file_name_indices:
+        compound = compound_sentiment[
+                   json_file_name_indices[json_f][0]: json_file_name_indices[json_f][1]]
+        module_logger.info('{:45} {:.2f}%'.format(json_f, 100 * sum(compound) / len(compound)))
+    module_logger.info('{:45} {:.2f}%'.format('Across the entire series',
+                                              100 * sum(compound_sentiment) / len(compound_sentiment)))
+
+    # Other way of sentiment analysis.  NRC emotion lexicon
+
+    # hp_df = None
+    # for json_file_name in hp:
+    #     print(json_file_name)
+    #     hp_df = None
+    #     data = {'file': [], 'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
+    #     for message_Id in hp[json_file_name]:
+    #         title = hp[json_file_name][message_Id][0]
+    #         #         print('   ', chapter, title)
+    #         text = ' '.join(hp[json_file_name][message_Id][1]).replace('\n', '')
+    #         language = hp[json_file_name][message_Id][4]
+    #         language2 = hp[json_file_name][message_Id][5]
+    #         data['file'].append(json_file_name)
+    #         data['message_Id'].append(title)
+    #         data['text'].append(text)
+    #         data['language'].append(language)
+    #         data['language2'].append(language2['language'])
+    #         data['compound'].append(hp[json_file_name][message_Id][3]['compound'])
+    #
+    #     hp_df = pd.DataFrame(data=data)
+    #     hp_df = text_emotion(hp_df, 'text')
+    #     module_logger.info(hp_df.to_string())
 
 
 if __name__ == '__main__':
-    #thiis main is just only for trsting. in this file we define the class text_processor that is used in amywhere
-    #but for testing text processor methosd, it is possible to use it.
+    # this main is just only for testing. in this file we define the class text_processor that is used in anywhere
+    # but for testing text processor methods, it is possible to use it.
     main()

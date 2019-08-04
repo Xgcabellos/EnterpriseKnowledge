@@ -55,3 +55,9 @@ wget https://github.com/neo4j-contrib/neo4j-graph-algorithms/releases/download/3
 sudo nano /etc/neo4j/neo4j.conf
 # add dbms.security.procedures.unrestricted=algo.*,apoc.*
 #dbms.security.auth_enabled=false
+pip install -U spacy
+python -m spacy download en
+python -m spacy download es
+python -m spacy download xx
+pip install spacy-langdetect
+

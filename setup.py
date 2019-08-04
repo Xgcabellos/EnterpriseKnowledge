@@ -9,5 +9,6 @@ setup(
     author='xgarcia',
     author_email='xgcabellos@gmail.com',
     description='Email interpreter as internal relationship of the company ', install_requires=['psutil', 'inflect',
-                                                                                                'nltk', 'neo4j']
+                                                                                                'nltk', 'neo4j',
+                                                                                                'vaderSentiment']
 )

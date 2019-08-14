@@ -1,10 +1,8 @@
 import configparser
-import json
 import logging
 import re
 import unicodedata
 import warnings
-from collections import defaultdict
 from logging import Logger
 
 import contractions
@@ -15,7 +13,6 @@ from bs4 import Comment
 # from email_reply_parser import EmailReplyParser
 from htmllaundry import sanitize
 from nltk.corpus import stopwords
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -30,9 +27,8 @@ import os
 # Set Pandas to display all rows of dataframes
 
 # nltk
-from nltk import tokenize, wordpunct_tokenize
+from nltk import wordpunct_tokenize
 import pandas as pd
-from nltk import word_tokenize
 
 pd.set_option('display.max_rows', 500)
 
@@ -156,7 +152,7 @@ class TextProcess:
         for message in json_message['parts']:
             if message['contentType'] == 'text/html':
                 # message[ 'content' ] = sanitize(self.clean_html(message[ 'content' ]))
-                clean_text0 = self.prepare_paragraphs(message['content'])
+                clean_text0 = self.prepare_paragraphs(self.remove_between_square_brackets(message['content']))
                 clean_text1 = self.clean_html(clean_text0)
                 clean_text2 = sanitize(clean_text1)
                 message['content'] = clean_text2
@@ -502,70 +498,7 @@ def detect_language_spacy(text):
     return doc._.language
 
 
-filepath = ('data/'
-            'NRC-Sentiment-Emotion-Lexicons/'
-            'NRC-Emotion-Lexicon-v0.92/'
-            'NRC-Emotion-Lexicon-Wordlevel-v0.92.txt')
-emolex_df = pd.read_csv(filepath,
-                        names=["word", "emotion", "association"],
-                        sep='\t')
-emolex_words = emolex_df.pivot(index='word',
-                               columns='emotion',
-                               values='association').reset_index()
-emotions = emolex_words.columns.drop('word')
 
-
-def text_emotion(df, column):
-    """
-    Takes a DataFrame and a specified column of text and adds 10 columns to the
-    DataFrame for each of the 10 emotions in the NRC Emotion Lexicon, with each
-    column containing the value of the text in that emotions
-    INPUT: DataFrame, string
-    OUTPUT: the original DataFrame with ten new columns
-    """
-
-    new_df = df.copy()
-
-    emo_df = pd.DataFrame(0, index=df.index, columns=emotions)
-
-    # stemmer = nltk.SnowballStemmer("english")
-
-    file = ''
-    message_Id = ''
-    language = ''
-    language2 = ''
-    for i, row in new_df.iterrows():
-
-        # if row['file'] != file:
-        #     # print(row['file'])
-        #     file = row['file']
-        if row['message_Id'] != message_Id:
-            # print('   ', row['message_Id'])
-            message_Id = row['message_Id']
-        if row['language'] != language:
-            # print('   ', row['message_Id'])
-            language = row['language']
-        if row['language2'] != language2:
-            # print('   ', row['message_Id'])
-            language2 = row['language2']
-            if language2 == 'ca':
-                language2 = 'spanish'
-            elif language2 == 'es':
-                language2 = 'spanish'
-            else:
-                language2 = 'english'
-        document = word_tokenize(new_df.loc[i][column])
-        stemmer = nltk.SnowballStemmer(language)
-        for word in document:
-            word = stemmer.stem(word.lower())
-            emo_score = emolex_words[emolex_words.word == word]
-            if not emo_score.empty:
-                for emotion in list(emotions):
-                    emo_df.at[i, emotion] += emo_score[emotion]
-
-    new_df = pd.concat([new_df, emo_df], axis=1)
-
-    return new_df
 
 
 def main():
@@ -582,177 +515,6 @@ def main():
                 if number_of_files > 0:
                     json_file.append(os.path.join(r, json_f))
                 number_of_files -= 1
-
-    hp = defaultdict(dict)
-    for jfile in json_file:
-        with open(jfile, 'r') as f:
-            data = json.load(f)
-        doc_list = []
-
-        for doc in data:
-            proc = TextProcess(False)  # not visualization of replies
-            proc.clean_json_message(doc)
-            doc_list.append(proc)
-        module_logger.info(jfile + ' processing {} messages....'.format(str(len(doc_list))))
-
-        # write matrix with a list of paragraphs
-
-        for messageInfo in doc_list:
-            number_of_seen = 0
-            list_fragments = []
-            languages = {}
-
-            for p in messageInfo.fragments:
-                if not p.hidden:
-                    number_of_seen += 1
-                    list_fragments.append(p.content)
-                    language = detect_language(p.content)
-                    if language in languages:
-                        languages[language] += 1
-                    else:
-                        languages[language] = 1
-
-            hp[jfile][messageInfo.textId] = (messageInfo.title, list_fragments, languages)
-
-    hp = dict(hp)
-
-    # The compound score is computed by summing the valence scores of each word in the lexicon, adjusted according
-    # to the rules, and then normalized to be between -1 (most extreme negative) and +1 (most extreme positive).
-    # This is the most useful metric if you want a single unidimensional measure of sentiment for a given sentence.
-    # Calling it a 'normalized, weighted composite score' is accurate.
-    # i t is also useful for researchers who would like to set standardized thresholds for classifying sentences
-    # as either positive, neutral, or negative.Typical threshold values (used in the literature cited on this page)
-    # are:
-
-    #
-    # positive sentiment: compound score >= 0.05
-    # neutral sentiment: (compound score > -0.05) and (compound score < 0.05)
-    # negative sentiment: compound score <= -0.05
-
-    # The pos, neu, and neg scores are ratios for proportions of text that fall in each category (so these should all
-    # add up to be 1... or close to it with float operation). These are the most useful metrics if you want
-    # multidimensional measures of sentiment for a given sentence.
-    # https://github.com/cjhutto/vaderSentiment?source=post_page---------------------------
-
-    p = None
-    # data = {'file': [], 'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
-    data = {'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
-    hp_df = None
-    analyzer = SentimentIntensityAnalyzer()
-    for json_f in hp:
-        index = 0
-        for messageId in hp[json_f]:
-            sentence_list = []
-            for p in hp[json_f][messageId][1]:
-                text = p.replace('\n', '').replace('\r', ' ')
-
-                sentence_list += tokenize.sent_tokenize(text)
-
-            sentiments = {'compound': 0.0, 'neg': 0.0, 'neu': 0.0, 'pos': 0.0}
-
-            for sentence in sentence_list:
-                vs = analyzer.polarity_scores(sentence)
-                sentiments['compound'] += vs['compound']
-                sentiments['neg'] += vs['neg']
-                sentiments['neu'] += vs['neu']
-                sentiments['pos'] += vs['pos']
-
-            if len(sentence_list):
-                sentiments['compound'] = sentiments['compound'] / len(sentence_list)
-                sentiments['neg'] = sentiments['neg'] / len(sentence_list)
-                sentiments['neu'] = sentiments['neu'] / len(sentence_list)
-                sentiments['pos'] = sentiments['pos'] / len(sentence_list)
-
-            # lang ='NONE' #
-            lang = detect_language(' '.join(sentence_list))
-            # if 'arabic' in lang:
-            #     lang= DEFAULT_LANGUAGE
-
-            lang2 = {'language': 0}
-            # lang2 = detect_language_spacy(' '.join(sentence_list))
-
-            hp[json_f][messageId] = (hp[json_f][messageId][0], hp[json_f][messageId][1],
-                                     hp[json_f][messageId][2], sentiments, lang, lang2)
-            index += 1
-            # module_logger.info('{:45} compound:{:.3f},neg:{:.3f},neu:{:.3f}, pos:{:.3f}'
-            #                    .format(hp[json_file_name][text_id][0], hp[json_file_name][text_id][3]['compound'],
-            #                            hp[json_file_name][text_id][3]['neg'],
-            #                            hp[json_file_name][text_id][3]['neu'],
-            #                            hp[json_file_name][text_id][3]['pos']))
-            # module_logger.info('{:45} compound:{:.3f}, languages: {}, main language: {}, language 2 {}'
-            # module_logger.info('{:45} compound:{:.3f}, main language: {}, language2: {}'
-            #                    .format(hp[json_f][messageId][0], hp[json_f][messageId][3]['compound'],
-            #                            # str(hp[json_file_name][message_Id][2]),
-            #                            str(hp[json_f][messageId][4]),
-            #                            str(hp[json_f][messageId][5]['language'])))
-
-            # Other way of sentiment analysis.  NRC emotion lexicon
-
-            title = hp[json_f][messageId][0]
-            #         print('   ', chapter, title)
-            text = ' '.join(hp[json_f][messageId][1]).replace('\n', '').replace('\r', ' ')
-            language = hp[json_f][messageId][4]
-            language2 = hp[json_f][messageId][5]
-            # data['file'].append(json_f)
-            data['message_Id'].append(title)
-            data['text'].append(text)
-            data['language'].append(language)
-            data['language2'].append(language2['language'])
-            data['compound'].append(hp[json_f][messageId][3]['compound'])
-
-        hp_df = pd.DataFrame(data=data)
-        hp_df = text_emotion(hp_df, 'text')
-        # index = hp_df.shape[0]
-        module_logger.info(hp_df.to_string())  # hp_df.iloc[index2, : ])
-
-        data = {'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
-        # compound_sentiments = [hp[json_file_name][text_id][3]['compound'] for json_file_name in hp
-        #                     for text_id in hp[json_file_name]]
-
-    json_file_name_indices = {}
-    idx = 0
-    for json_f in hp:
-        start = idx
-        for message_Id in hp[json_f]:
-            idx += 1
-        json_file_name_indices[json_f] = (start, idx)
-
-    sentiment_scores = [
-        [hp[json_file_name][textId][3][sentiment] for json_file_name in hp for textId in hp[json_file_name]]
-        for sentiment in ['compound', 'neg', 'neu', 'pos']]
-
-    compound_sentiment = sentiment_scores[0]
-
-    for json_f in json_file_name_indices:
-        compound = compound_sentiment[
-                   json_file_name_indices[json_f][0]: json_file_name_indices[json_f][1]]
-        module_logger.info('{:45} {:.2f}%'.format(json_f, 100 * sum(compound) / len(compound)))
-    module_logger.info('{:45} {:.2f}%'.format('Across the entire series',
-                                              100 * sum(compound_sentiment) / len(compound_sentiment)))
-
-    # Other way of sentiment analysis.  NRC emotion lexicon
-
-    # hp_df = None
-    # for json_file_name in hp:
-    #     print(json_file_name)
-    #     hp_df = None
-    #     data = {'file': [], 'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
-    #     for message_Id in hp[json_file_name]:
-    #         title = hp[json_file_name][message_Id][0]
-    #         #         print('   ', chapter, title)
-    #         text = ' '.join(hp[json_file_name][message_Id][1]).replace('\n', '')
-    #         language = hp[json_file_name][message_Id][4]
-    #         language2 = hp[json_file_name][message_Id][5]
-    #         data['file'].append(json_file_name)
-    #         data['message_Id'].append(title)
-    #         data['text'].append(text)
-    #         data['language'].append(language)
-    #         data['language2'].append(language2['language'])
-    #         data['compound'].append(hp[json_file_name][message_Id][3]['compound'])
-    #
-    #     hp_df = pd.DataFrame(data=data)
-    #     hp_df = text_emotion(hp_df, 'text')
-    #     module_logger.info(hp_df.to_string())
 
 
 if __name__ == '__main__':

@@ -42,7 +42,7 @@ __description__ = 'This scripts read text and html and break it in different ele
 
 
 # noinspection PyCompatibility
-config_name = '../input/config.ini'
+config_name = './input/config.ini'
 json_directory = './json/'
 
 

@@ -15,7 +15,7 @@ __date__ = '20180101'
 __version__ = 0.01
 __description__ = 'This scripts write emails in datasource Neo4J'
 
-config_name = '../input/config.ini'
+config_name = './input/config.ini'
 
 config = configparser.ConfigParser()
 config.read(config_name)
@@ -32,9 +32,10 @@ module_logger = getLogger('Neo4jStorageEmail')
 class neo4J_storageEmail(StorageEmail):
     def __init__(self, driver, log_file, log_level, log_directory):
         self.driver = driver
+        self.logger = self.active_log(log_file, log_level, log_directory)
         log = getLogger("neo4j.bolt")
         log.setLevel(log_level_conversor(config['LOGS']['log_level_neo4j']))
-        self.logger = self.active_log(log_file, log_level, log_directory)
+
 
     def storage_type(self):
         """"Return a string representing the type of connection this is."""
@@ -44,6 +45,8 @@ class neo4J_storageEmail(StorageEmail):
         self.driver = GraphDatabase.driver(url, auth=(login, pw))
         self.self.open_db = True
         self.logger = self.active_log(log_name, log_level, log_directory)
+        with self.driver.session() as session:
+            session.write_transaction(self.define_emailUser_constraint)
         return self.driver
 
     def __del__(self):
@@ -321,7 +324,7 @@ class neo4J_storageEmail(StorageEmail):
                         email_date = neotime.DateTime.from_native(parse(msg['Date']))
 
                 with self.driver.session() as session:
-                    session.write_transaction(self.define_emailUser_constraint)
+                    # session.write_transaction(self.define_emailUser_constraint)
                     for _from in sender:
                         if not (email_to is None):
                             for to in email_to:

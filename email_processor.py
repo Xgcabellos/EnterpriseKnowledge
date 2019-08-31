@@ -28,7 +28,7 @@ _ORG_EMAIL = ""
 _SMTP_SERVER = ''
 log_path = ""
 ORG_EMAIL = ''
-config_name = '../input/config.ini'
+config_name = './input/config.ini'
 
 config = configparser.ConfigParser()
 config.read(config_name)
@@ -94,6 +94,7 @@ def processFolders(reader, name_folder, _FROM_EMAIL, output_queue):
                            config['CONNECTION']['MONGODB_DATABASE'])
     reader.json_store = json_store  # JsonStorageEmail(log_name, log_level_json, log_directory)
 
+
     if driver is not None:
         try:
             driver2 = GraphDatabase.driver("bolt://" + GRAPHDDBB_SERVER + ":7687",
@@ -107,7 +108,11 @@ def processFolders(reader, name_folder, _FROM_EMAIL, output_queue):
         except Exception as bErr:
             module_logger.error('Error connecting GraphDatabase: %s', bErr)
 
-    graph_store = neo4J_storageEmail(driver2, log_name, log_level_graph, log_directory)
+    try:
+
+        graph_store = neo4J_storageEmail(driver2, log_name, log_level_graph, log_directory)
+    except Exception as bErr:
+        module_logger.error('Error connecting GraphDatabase: %s', bErr)
 
     start_email_num = 0
     steps = NUMBER_OF_MESSAGES_BY_CYCLE  # each how many messages we are going to process @configuration
@@ -152,9 +157,6 @@ def processFolders(reader, name_folder, _FROM_EMAIL, output_queue):
     module_logger.debug('Processed ' + str(len(message_list)) + ' messages in folder ' + name_folder)
     output_queue.put(message_list)
     # return  message_list
-
-
-active_log(log_name, log_level, log_directory)
 
 # QueueListener(
 #    _log_queue, logging.FileHandler("./logs/EKnowledge.log")).start()
@@ -262,13 +264,14 @@ def main():
         message_list = []
 
         list_of_connexions = {}
+        list_of_folders = {}
         for folder in reader.folder_list:
             forbidden = email_process.forbidden(folder)
             # Get the las value of the folder. iti is the name ofi the folder.
             name_folder = str(folder).split('"/"')[-1]
             # # be careful - with google is not exactly the same. verify.
             name_folder = name_folder.replace('\'', '').replace('"', '').strip()
-
+            module_logger.info('folder read:{} Verification:{} '.format(name_folder, str(forbidden)))
             if not forbidden:
                 repeat_connexion = True
                 reader2 = None
@@ -296,6 +299,7 @@ def main():
                         p = mp.Process(target=processFolders, args=(reader2, name_folder, FROM_EMAIL, output_queue), )
                         list_of_process.append(p)
                         list_of_connexions[p.name] = reader2
+                        list_of_folders[p.name] = name_folder
                         p.start()
                         module_logger.debug(name_folder + ' folder has started in process %s', p.name)
                         repeat_connexion = False
@@ -307,10 +311,12 @@ def main():
                                 if output_queue.qsize() > 0:
                                     message_list += output_queue.get()
 
-                                module_logger.info('{}.exitcode = {}'.format(p1.name, p1.exitcode) +
+                                module_logger.info(
+                                    '{}: {}.exitcode = {}'.format(list_of_folders[p1.name], p1.name, p1.exitcode) +
                                                    ' : Processed ' + str(len(message_list)) +
                                                    ' messages ')
 
+                                del list_of_folders[p1.name]
                                 del list_of_connexions[p1.name]
                                 list_of_process.remove(p1)
                                 repeat_connexion = False
@@ -327,7 +333,7 @@ def main():
                 # module_logger.debug('ending while  that verify the  number of connexions')
 
             else:
-                module_logger.debug('folder not read:{}'.format(name_folder))
+                module_logger.info('folder not read:{}'.format(name_folder))
 
         # Get process results from the output queue
         finish = len(list_of_process)
@@ -341,9 +347,11 @@ def main():
                             module_logger.warning(
                                 'Queue empty. Doesn\'t matter if it say  queue is not empty: {}'.format(QueueException))
                     finish -= 1
-                    module_logger.info('{}.exitcode 2 = {}'.format(p.name, p.exitcode) +
+                    module_logger.info('{}: {}.exitcode 2 = {}'.format(list_of_folders[p.name], p.name, p.exitcode) +
                                        ' : Processed ' + str(len(message_list)) +
                                        ' messages ')
+                    # list_of_connexions[p.name].mail.logout()
+                    del list_of_folders[p.name]
                     del list_of_connexions[p.name]
                     list_of_process.remove((p))
 
@@ -357,6 +365,10 @@ def main():
         all_messages += message_list
         module_logger.info('Processed ' + str(len(all_messages)) + ' messages all folder ')
         list_of_connexions.clear()
+        if len(list_of_folders) != 0:
+            module_logger.info(' The following folders has not finished.')
+            module_logger.info(list_of_folders)
+
 
     # statistics
     # summary(all_messages)
@@ -370,6 +382,8 @@ def main():
 
     graph = Neo4jGhaphAnalytic(driver, log_name, log_level, log_directory)
     graph.analysis()
+    module_logger.info('exit GraphDatabase: %s')
+    return 0
 
 
 os.__call__ = processFolders
@@ -399,6 +413,8 @@ if __name__ == '__main__':
         Usage :  python3 email_processor.py -c ../input/config.ini
         (note) All args are optional: '-c'
     '''
+
+    active_log(log_name, log_level, log_directory)
 
     config_name = check_arg(sys.argv[1:])
     print('Inputs: config_file=%s ' % config_name)

@@ -4,7 +4,7 @@ setup(
     name='EKnowledge',
     version='0.1',
     packages=[ '' ],
-    url='https://github.com/Xgcabellos/EKnowledge.git',
+    url='https://github.com/Xgcabellos/EnterpriseKnowledge.git',
     license='Copyright Xavier Garcia Cabellos & Alvaro Roman',
     author='xgarcia',
     author_email='xgcabellos@Gmail.com',

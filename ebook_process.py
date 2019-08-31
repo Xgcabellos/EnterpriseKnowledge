@@ -20,7 +20,7 @@ __description__ = 'This scripts read EbookProcess and break it in different elem
 # Notas: # html2text.html2text(html) para pasar de html a text
 books_file = '../input/books/Free_as_in_freedom.epub'  # for testing
 module_logger = logging.getLogger('ebookprocess')
-log_level = logging.INFO
+log_level = logging.DEBUG
 
 
 # noinspection PyCompatibility

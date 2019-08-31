@@ -22,6 +22,7 @@ from jinja2 import Template
 from psutil._compat import xrange
 from py._xmlgen import unicode
 
+from Sentiment_analysis import sentimentAnalysis
 from abstract_process import AbstractEmail
 from connection_properties import email_DUMMY_connexionProperties
 from text_process import TextProcess, log_level_conversor
@@ -33,7 +34,7 @@ __date__ = '20190101'
 __version__ = 0.01
 __description__ = 'This scripts handles processing and output of Gmail and  Email Containers'
 
-config_name = '../input/config.ini'
+config_name = './input/config.ini'
 
 config = configparser.ConfigParser()
 config.read(config_name)
@@ -59,6 +60,7 @@ class Gmail(AbstractEmail):
     folder_dict_data = {}
     status = 0
     logger = None
+    sentiment_analysis_obj = None
 
     output_directory = config['OUTPUT']['DIRECTORY_OUTPUT']  # './output/'
     json_directory = config['OUTPUT']['DIRECTORY_JSON']
@@ -111,6 +113,7 @@ class Gmail(AbstractEmail):
                     self.logger.error(
                         "error in reading (" + str(name_folder) + ") for prepare the dict of size and data- %s ",
                         read_exp)
+        self.sentiment_analysis_obj = sentimentAnalysis()
 
     def __del__(self):
         """closing the email connection"""
@@ -265,7 +268,7 @@ class Gmail(AbstractEmail):
             :msg  email message
             :return json_msg. A json string message
         """
-
+        messageId = ''
         FORBIDDEN_TAGS_LIST = FORBIDDEN_TAGS.split(',')
         json_msg = {'parts': []}
         # with this i'm going to eliminate almos all microsoft internal tags.
@@ -351,9 +354,17 @@ class Gmail(AbstractEmail):
         except Exception as e:
             self.logger.error("error parsing Date :" + str(json_msg['Date']) + ' : ' + str(e))
 
-        # The final point is to process the paraphs
-        proc = TextProcess()
-        proc.clean_json_message(json_msg)
+        # The final point is to process the sentiment
+        try:
+
+            messageId = json_msg['Message-Id']
+            sentiments = self.sentiment_analysis_obj.compound_sentiments(
+                self.sentiment_analysis_obj.message_row(json_msg))
+            json_msg['CompoundSentiment'] = sentiments[messageId][3]['compound']
+            json_msg['Language'] = str(sentiments[messageId][4])
+
+        except Exception as sentimentsProcessError:
+            self.logger.error("error analysing  sentiments.  Message : " + str(sentimentsProcessError))
 
         return json_msg
 
@@ -455,6 +466,7 @@ class Gmail(AbstractEmail):
         """
 
         email_list = self.read(start_email_num, finish_email_num, name_folder)
+        email_list = self.email_filter(email_list)
         if email_list is not None:
             if len(email_list) > 0 and self.json_store is not None:
                 # folder can have slash in meddle of the name.
@@ -699,8 +711,8 @@ def summary(message_list):
         module_logger.exception('Error preparing the global summary. %s', str(e))
 
 
-FORBIDDEN_FOLDER = {'NOSELECT', 'TRASH', 'JUNK', 'SPAM', 'DRAFT', 'ALL', 'CHATS', 'SCHEDULED', 'MAKED', 'TEMPLATE',
-                    'RSS'}
+FORBIDDEN_FOLDER = {'NOSELECT', 'TRASH', 'JUNK', 'SPAM', 'DRAFT', 'ALL', 'CHATS', 'SCHEDULED', 'MAKER', 'TEMPLATE',
+                    'RSS', 'CALENDAR', 'DELETED', 'CONTACTS', 'ALL'}
 FORBIDDEN_FOLDER_BY_LANGUAGE = {'BORRADORES', 'PAPELERA', 'CORREO ELECTR&APM-NICO NO DESEADO', 'CALENDARIO',
                                 'TODOS', 'IMPORTANTES', 'PROGRAMADOS', 'DESTACADOS', 'CONTACTOS', 'NO DESEADO',
                                 'ELIMINADOS', 'TASKS', 'TAREAS', 'BORRADORES', 'SINCRONI'}

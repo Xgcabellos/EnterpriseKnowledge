@@ -41,7 +41,7 @@ __version__ = 0.01
 __description__ = 'This scripts read text and give the sentiment of different mails'
 
 # noinspection PyCompatibility
-config_name = '../input/config.ini'
+config_name = './input/config.ini'
 json_directory = './json/'
 
 

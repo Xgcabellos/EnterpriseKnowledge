@@ -17,31 +17,28 @@ config_name = './input/config.ini'
 config = configparser.ConfigParser()
 config.read(config_name)
 
-log_name = config['LOGS']['LOG_FILE']
-log_directory = config['LOGS']['LOG_DIRECTORY']
-log_level = log_level_conversor(config['LOGS']['log_level_json'])
-
-module_logger = getLogger('MongoDbStorageEmail')
+module_logger = getLogger('MongoDbStorage')
 
 
-class mongodb_storageEmail(StorageEmail):
+class mongodb_storage(StorageEmail):
     driver = None
     logger = None
     database = 'eknowedgedb'
 
-    def __init__(self, driver, log_file, log_level, log_directory):
+    def __init__(self, driver=None, log_file=config['LOGS']['LOG_FILE'],
+                 log_level=log_level_conversor(config['LOGS']['log_level_json']),
+                 log_directory=config['LOGS']['LOG_DIRECTORY']):
         if driver is not None:
             self.driver = driver
-            monitoring.register(CommandLogger())
+        monitoring.register(CommandLogger())
         self.logger = self.active_log(log_file, log_level, log_directory)
 
     def storage_type(self):
         """"Return a string representing the type of connection this is."""
-        return 'mongodb'
+        return 'mongodb storage'
 
     def connect(self, url, user, password, authSource=database):
-        if self.logger is None:
-            self.logger = self.active_log('mongodb_storageEmail' + '.log', self.level)
+
         self.driver = MongoClient(url, username=user,
                                   password=password, authSource=authSource,
                                   authMechanism='SCRAM-SHA-1', event_listeners=[CommandLogger()])
@@ -176,22 +173,20 @@ def main():
     users_file = "../input/users.csv"
     books_directory = '../input/books/'
     knowledge_file = "../input/knowledges.csv"
-    module_logger = getLogger('MongoDbStorageEmail')
+    module_logger = getLogger('MongoDbStorage')
 
-    json_store = mongodb_storageEmail(None, log_name, log_level_json, log_directory)
+    json_store = mongodb_storage()
     json_store.connect('localhost', 'admin', 'Gandalf6981', 'admin')
-    import json
-    from bson.json_util import loads
 
-    with open(json_directory + 'xgcabellos.gmail0_INBOX.json', 'r') as f:
-        data = json.load(f)
-    json_list = []
-    for doc in data:
-        data_json = loads(json.dumps(doc))
-        json_list.append(data_json)
-    json_store.store(json_list)
+    # with open(json_directory + 'xgcabellos.gmail0_INBOX.json', 'r') as f:
+    #     data = json.load(f)
+    # json_list = []
+    # for doc in data:
+    #     data_json = loads(json.dumps(doc))
+    #     json_list.append(data_json)
+    # json_store.store(json_list)
 
-    db = json_store.driver['eknowegdedb']
+    db = json_store.driver['tuitravel-ad']
     emails = db.emails
     senders = [i for i in emails.distinct("From")]
 

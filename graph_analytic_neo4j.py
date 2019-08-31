@@ -12,7 +12,7 @@ __date__ = '20190701'
 __version__ = 0.01
 __description__ = 'This script get analytic from  datasource Neo4J'
 
-config_name = '../input/config.ini'
+config_name = './input/config.ini'
 
 config = configparser.ConfigParser()
 config.read(config_name)

@@ -3,6 +3,7 @@ import json
 import logging
 import warnings
 
+from mongodb_storage_analysis import mongodb_storage
 from sentiment_process import log_level_conversor, active_log, message_matrix, \
     message_row, compound_sentiments, emotion_sentiments, reading_json_files
 
@@ -61,29 +62,81 @@ class sentimentAnalysis:
     def emotion_sentiments(self, hp):
         return emotion_sentiments(hp)
 
-    def sentiment_analysis_fromfile(self, source, target):
-        path = json_directory
-        number_of_json_files = 2
-
+    def sentiment_analysis_fromfile(self, path=json_directory, number_of_json_files=2):
         # Getting the files
         json_files = self.reading_json_files(path, number_of_json_files)
 
         # Getting all messages in a matrix
         for jfile in json_files:
             data = self.message_list_from_json_file(jfile)
-            # for doc in data:
-            #     hp = self.message_row(doc)
-            #     # hp = message_matrix(jfile)
-            #     hp = self.compound_sentiments(hp)
-
             hp2 = self.message_matrix(data)
-            hp2 = self.compound_sentiments(hp2)
+            # hp2 = self.compound_sentiments(hp2)
             hp_df = self.emotion_sentiments(hp2)
-        return 0
+        return hp_df
+
+    def sentiment_analysis_fromDDBB(self, json_sentiment_store, collection_name, limit):
+        """
+
+        :rtype: object
+        """
+        db = json_sentiment_store.driver[collection_name]
+        emails = db.emails
+        data = []
+        # testing
+        emails_p = [i for i in emails.distinct("_id")]
+        emails_m = [i for i in emails.distinct("Message-Id")]
+        senders = [i for i in emails.distinct("From")]
+        receivers = [i for i in emails.distinct("To")]
+        cc_receivers = [i for i in emails.distinct("Cc")]
+        bcc_receivers = [i for i in emails.distinct("Bcc")]
+        print("Num id: %i", len(emails_p))
+        print("Num messageId: %i", len(emails_m))
+        print("Num Senders: %i", len(senders))
+        print("Num Receivers: %i", len(receivers))
+        print("Num CC Receivers: %i", len(cc_receivers))
+        print("Num BCC Receivers: %i", len(bcc_receivers))
+
+        if not limit < 0:
+            data = [j for j in emails.find().limit(limit)]
+        else:
+            data = [j for j in emails.find()]
+        # Getting all messages in a matrix
+        self.logger.info('starting message_matrix ')
+        hp2 = self.message_matrix(data)
+        # self.logger.info('starting compount sentiments ')
+        # hp2 = self.compound_sentiments(hp2)
+        self.logger.info('starting emotion sentiments ')
+        hp_df = self.emotion_sentiments(hp2)
+        self.logger.info('end sentiments ')
+        return hp_df
+
+
+def sentiment_analysis(json_store, company, limit):
+    """
+
+    :param limit:
+    :param company:
+    :type json_store: object
+    :rtype: Dataframe
+    """
+    df = sentimentAnalysis().sentiment_analysis_fromDDBB(json_store, company, limit)
+    if json_store is not None:
+        if json_store.storage_type() == 'mongodb storage':
+            db = json_store.driver[company]
+            emotions = db.emotions
+            # records = json.loads(df.T.to_json()).values()
+            # write in mongoDb
+            emotions.insert_many(df.to_dict('records'))
+        elif json_store.storage_type() == 'file':
+            json_store.store((df.T.to_json()).values(), json_directory, company)
+    return df
 
 
 if __name__ == '__main__':
     # this main is just only for testing. in this file we define the class text_processor that is used in anywhere
     # but for testing text processor methods, it is possible to use it.
 
-    sentimentAnalysis().sentiment_analysis(source, target)
+    json_store = mongodb_storage()
+    json_store.connect('localhost', 'admin', 'Gandalf6981', 'admin')
+    company = 'tuitravel-ad'
+    sentiment_analysis(json_store, company, 100)

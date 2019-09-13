@@ -177,6 +177,45 @@ class TextProcess:
 
         return json_message
 
+    def paraphs_message(self, json_message):
+        self.json_doc = json_message
+        if "Subject" in json_message:
+            self.title = json_message["Subject"]
+        if "Message-Id" in json_message:
+            self.textId = json_message["Message-Id"]
+        elif "Message-ID" in json_message:
+            self.textId = json_message["Message-ID"]
+        else:
+            raise Exception(
+                " Fatal Error. the message-ID or Message-Id of {}  doesn't exist. It doesn't SHOULD happened".format(
+                    self.title))
+        self.writer = json_message["From"]
+
+        self.document_processed = []
+        self.fragments = []
+        for message in json_message['parts']:
+            if message['contentType'] == 'text/html':
+                soup = BeautifulSoup(message['content'], 'lxml')
+                paraphs = soup.find_all(self.TEXT_TAGS)
+
+                for p in paraphs:
+                    text = p.getText().rstrip()
+                    if text != '':
+                        self.scan_paraph(text)
+                        self._finish_fragment()
+                        self.document_processed.append(text)
+            elif message['contentType'] == 'text/plain':
+                paraphs = self.split_paragraphs(message['content'])
+                paraphs_list = []
+                for p in paraphs:
+                    text = p
+                    if text != '':
+                        self.scan_paraph(text)
+                        self._finish_fragment()
+                        self.document_processed.append(text)
+
+        return json_message
+
     def scan_paraph(self, line):
         """ Reviews each line in email message and determines fragment type
 
@@ -310,7 +349,7 @@ class TextProcess:
 
     @staticmethod
     def strip_html(text):
-        soup = BeautifulSoup(text, 'lxml')  # "html.parser")
+        soup = BeautifulSoup(text, 'html.parser')
         for tag in soup.findAll(True):
             if tag.name not in TextProcess.VALID_TAGS:
                 tag.hidden = True
@@ -375,7 +414,7 @@ class TextProcess:
         return new_words
 
     @staticmethod
-    def replace_numbers(words):
+    def replace_numbers(words, language='english'):
         """Replace all interger occurrences in list of tokenized words with textual representation"""
         p = inflect.engine()
         new_words = []
@@ -388,11 +427,11 @@ class TextProcess:
         return new_words
 
     @staticmethod
-    def remove_stopwords(words):
+    def remove_stopwords(words, language='english'):
         """Remove stop words from list of tokenized words"""
         new_words = []
         for word in words:
-            if word not in stopwords.words('english'):
+            if word not in stopwords.words(language):
                 new_words.append(word)
         return new_words
 
@@ -417,13 +456,32 @@ class TextProcess:
         return lemmas
 
     @staticmethod
-    def normalize(words):
+    def normalize(words, language='english'):
+
         words = TextProcess.remove_non_ascii(words)
         words = TextProcess.to_lowercase(words)
         words = TextProcess.remove_punctuation(words)
-        words = TextProcess.replace_numbers(words)
-        words = TextProcess.remove_stopwords(words)
+        # words = TextProcess.replace_numbers(words)
+        # try:
+        #     words = TextProcess.remove_stopwords(words,language)
+        # except Exception as stopwordsException:
+        #     module_logger.error(stopwordsException)
         return words
+
+    @staticmethod
+    def normalize_text(text, language='english'):
+        text = TextProcess.strip_html(text)
+        text = TextProcess.remove_between_square_brackets(text)
+        try:
+            words = nltk.word_tokenize(text, language)
+        except Exception as tokenizeException:
+            module_logger.error('{} produce tokenizeException with language {}'.format(text, language))
+            return text
+        try:
+            words = TextProcess.normalize(words, language)
+        except Exception as normalizeException:
+            module_logger.error('{} produce normalizeException with language {}'.format(text, language))
+        return ' '.join(words)
 
 
 class Paragraph(object):

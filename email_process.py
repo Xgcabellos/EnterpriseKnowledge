@@ -360,8 +360,8 @@ class Gmail(AbstractEmail):
             messageId = json_msg['Message-Id']
             sentiments = self.sentiment_analysis_obj.compound_sentiments(
                 self.sentiment_analysis_obj.message_row(json_msg))
-            json_msg['CompoundSentiment'] = sentiments[messageId][3]['compound']
-            json_msg['Language'] = str(sentiments[messageId][4])
+            json_msg['CompoundSentiment'] = sentiments[messageId][2]['compound']
+            json_msg['Language'] = str(sentiments[messageId][3])
 
         except Exception as sentimentsProcessError:
             self.logger.error("error analysing  sentiments.  Message : " + str(sentimentsProcessError))

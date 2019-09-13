@@ -188,6 +188,7 @@ def main():
 
     db = json_store.driver['tuitravel-ad']
     emails = db.emails
+
     senders = [i for i in emails.distinct("From")]
 
     receivers = [i for i in emails.distinct("To")]

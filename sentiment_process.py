@@ -27,7 +27,6 @@ import os
 # nltk
 from nltk import tokenize, wordpunct_tokenize
 import pandas as pd
-from nltk import word_tokenize
 
 # spaCy
 import spacy
@@ -93,15 +92,40 @@ filepath = ('data/'
             'NRC-Sentiment-Emotion-Lexicons/'
             'NRC-Emotion-Lexicon-v0.92/'
             'NRC-Emotion-Lexicon-Wordlevel-v0.92.txt')
-emolex_df = pd.read_csv(filepath, names=["word", "emotion", "association"], sep='\t')
-emolex_words = emolex_df.pivot(index='word', columns='emotion', values='association').reset_index()
-emotions = emolex_words.columns.drop('word')
+filepathml = ('data/'
+              'NRC-Sentiment-Emotion-Lexicons/'
+              'NRC-Emotion-Lexicon-v0.92/'
+              'NRC-Emotion-Lexicon-v0.92-In105Languages-Nov2017Translations.xlsx')
+
+# emolex_df = pd.read_csv(filepath, names=["word", "emotion", "association"], sep='\t')
+# emolex_words = emolex_df.pivot(index='word', columns='emotion', values='association').reset_index()
+# emotions = emolex_words.columns.drop('word')
+
+emolex_dfml = pd.read_excel(filepathml)
+print(emolex_dfml.head())
+fields_english = emolex_dfml.loc[:, 'English (en)']
+fields_spanish = emolex_dfml.loc[:, 'Spanish (es)']
+fields_french = emolex_dfml.loc[:, 'French (fr)']
+fields_german = emolex_dfml.loc[:, 'German (de)']
+
+emotions_ml = emolex_dfml.columns.to_list()
+emotions_ml = emotions_ml[105:]
+emotions_only = emolex_dfml.loc[:, emotions_ml]
+
+emolex_english = pd.concat([fields_english, emotions_only], axis=1)
+emolex_english.set_index('English (en)')
+emolex_spanish = pd.concat([fields_spanish, emotions_only], axis=1)
+emolex_spanish.set_index('Spanish (es)')
+emolex_french = pd.concat([fields_french, emotions_only], axis=1)
+emolex_french.set_index('French (fr)')
+emolex_german = pd.concat([fields_german, emotions_only], axis=1)
+emolex_german.set_index('German (de)')
 
 stemmer_english = nltk.SnowballStemmer('english')
 stemmer_spanish = nltk.SnowballStemmer('spanish')
-stemmer_spanish = nltk.SnowballStemmer('spanish')
 stemmer_french = nltk.SnowballStemmer('french')
 stemmer_german = nltk.SnowballStemmer('german')
+
 # Load info for spaCy find language
 nlp = spacy.load("en")
 nlp.add_pipe(LanguageDetector(), name="language_detector", last=True)
@@ -147,10 +171,11 @@ def detect_language(text):
     ratios = compute_ratios(text)
 
     mostLang = max(ratios, key=ratios.get)
+    # module_logger.info('detect_language...')
     if ratios[mostLang] > 0:
-        return mostLang
-    else:
-        return DEFAULT_LANGUAGE
+        if mostLang not in ['azerbaijani', 'romanian', 'hungarian']:
+            return mostLang
+    return DEFAULT_LANGUAGE
 
 
 def detect_language_spacy(text):
@@ -173,10 +198,10 @@ def text_emotion(df, column):
     INPUT: DataFrame, string
     OUTPUT: the original DataFrame with ten new columns
     """
-
+    LANGUAGES_ACEPTED = ['english', 'spanish', 'french', 'german']
     new_df = df.copy()
 
-    emo_df = pd.DataFrame(0, index=df.index, columns=emotions)
+    emo_df = pd.DataFrame(0, index=df.index, columns=emotions_ml)
 
     stemmer = None  # nltk.SnowballStemmer("english")
 
@@ -184,44 +209,106 @@ def text_emotion(df, column):
     message_Id = ''
     language = ''
     language2 = ''
+    column_lang_name = 'English (en)'
+    emolex = None
+    lemmatizer = None
     for i, row in new_df.iterrows():
 
-        # if row['file'] != file:
-        #     # print(row['file'])
-        #     file = row['file']
         if row['message_Id'] != message_Id:
             # print('   ', row['message_Id'])
             message_Id = row['message_Id']
         if row['language'] != language:
             # print('   ', row['message_Id'])
             language = row['language']
-        if row['language2'] != language2:
-            # print('   ', row['message_Id'])
-            language2 = row['language2']
-            if language2 == 'ca':
-                language2 = 'spanish'
-            elif language2 == 'es':
-                language2 = 'spanish'
-            else:
-                language2 = 'english'
+            if language not in LANGUAGES_ACEPTED:
+                language = detect_language(new_df.loc[i][column])
+                if language not in LANGUAGES_ACEPTED:
+                    language = DEFAULT_LANGUAGE
+        # if row['language2'] != language2:
+        #     # print('   ', row['message_Id'])
+        #     language2 = row['language2']
+        #     if language2 == 'ca':
+        #         language2 = 'spanish'
+        #     elif language2 == 'es':
+        #         language2 = 'spanish'
+        #     else:
+        #         language2 = 'english'
         if language == 'spanish':
             stemmer = stemmer_spanish
+
+            column_lang_name = 'Spanish (es)'
+            emolex = emolex_spanish
         elif language == 'english':
             stemmer = stemmer_english
+            column_lang_name = 'English (en)'
+            emolex = emolex_english
+
         elif language == 'french':
             stemmer = stemmer_french
+            column_lang_name = 'French (fr)'
+            emolex = emolex_french
+
         elif language == 'german':
             stemmer = stemmer_german
-        else:
-            stemmer = nltk.SnowballStemmer(language)
-        document = word_tokenize(new_df.loc[i][column])
+            column_lang_name = 'German (de)'
+            emolex = emolex_german
 
-        for word in document:
-            word = stemmer.stem(word.lower())
-            emo_score = emolex_words[emolex_words.word == word]
-            if not emo_score.empty:
-                for emotion in list(emotions):
-                    emo_df.at[i, emotion] += emo_score[emotion]
+        else:
+            try:
+                stemmer = nltk.SnowballStemmer(language)
+
+                emolex = emolex_dfml
+            except Exception as e:
+                module_logger.error(str(e))
+                stemmer = stemmer_english
+                column_lang_name = 'English (en)'
+                emolex = emolex_english
+
+        try:
+            module_logger.info('tokenize {}'.format(str(new_df.loc[i][column])))
+            document = text_process.TextProcess.normalize_text(new_df.loc[i][column])
+            if language == 'english':
+                document = text_process.TextProcess.lemmatize_verbs(document)
+
+            # for word in document:
+            #     word = stemmer.stem(word.lower())
+            #     emo_score = emolex_words[emolex_words.word == word]
+            #     if not emo_score.empty:
+            #         for emotion in list(emotions):
+            #             emo_df.at[i, emotion] += emo_score[emotion]
+            lengh = len(document)
+            for word in document:
+                # word = stemmer.stem(word.lower())
+
+                emo_score = emolex[emolex.loc[:, column_lang_name] == word]
+                # emo_score = emolex[emolex[column_lang_name].str.match(word, na=False)]
+
+                if not emo_score.empty:
+
+                    for emotion in list(emotions_ml):
+                        # print('word:{}, emo_score:{}'.format(word,str(emo_score[emotion])))
+
+                        l = len(emo_score[emotion].index)
+                        # be careful. sometimes return more than one. i have chosen the first.
+                        if l == 1:
+                            emo_df.at[i, emotion] += emo_score[emotion]
+                        else:
+                            emo_df.at[i, emotion] += emo_score.iloc[0][emotion]
+
+            module_logger.info(
+                'words:{}, row{}, language:{},  anger:{},  anticipation:{},  disgust:{},  fear:{},  joy:{}, '
+                ' negative:{},  positive:{},  sadness:{},  surprise:{},  trust:{}'
+                    .format(lengh, str(row['subject']), language, emo_df.loc[i].at['Anger'],
+                            emo_df.loc[i].at['Anticipation'],
+                            emo_df.loc[i].at['Disgust'],
+                            emo_df.loc[i].at['Fear'], emo_df.loc[i].at['Joy'], emo_df.loc[i].at['Negative'],
+                            emo_df.loc[i].at['Positive'], emo_df.loc[i].at['Sadness'],
+                            emo_df.loc[i].at['Surprise'],
+                            emo_df.loc[i].at['Trust']))
+            module_logger.info(
+                '----------------------------------------------------------------------------------------------')
+        except Exception as normalizeException:
+            module_logger.error(normalizeException)
 
     new_df = pd.concat([new_df, emo_df], axis=1)
 
@@ -243,18 +330,15 @@ def reading_json_files(path, number__files=10000):
     return json_file
 
 
-def message_matrix(jfile):
+def message_matrix(data):
     hp = defaultdict(dict)
-
-    with open(jfile, 'r') as f:
-        data = json.load(f)
     doc_list = []
 
     for doc in data:
         proc = text_process.TextProcess(True)  # not visualization of replies
-        proc.clean_json_message(doc)
+        proc.paraphs_message(doc)
         doc_list.append(proc)
-    module_logger.info(jfile + ' processing {} messages....'.format(str(len(doc_list))))
+    module_logger.info('processing {} messages....'.format(str(len(doc_list))))
 
     # write matrix with a list of paragraphs
 
@@ -266,11 +350,12 @@ def message_matrix(jfile):
         for p in messageInfo.fragments:
             if not p.hidden:
                 number_of_seen += 1
-                list_fragments.append(p.content)
                 language = detect_language(p.content)
-                languages.append(language)
+                list_fragments.append(p.content)
+                # language = detect_language(p.content)
+                # languages.append(language)
 
-        hp[messageInfo.textId] = (messageInfo.title, list_fragments, languages)
+        hp[messageInfo.textId] = (messageInfo.title, list_fragments)
 
     hp = dict(hp)
     return hp
@@ -356,7 +441,7 @@ def compound_sentiments(hp):
         # lang2 = detect_language_spacy(' '.join(sentence_list))
 
         hp[messageId] = (hp[messageId][0], hp[messageId][1],
-                         hp[messageId][2], sentiments, lang, lang2)
+                         sentiments, lang, lang2)
 
         # module_logger.info('{:45} compound:{:.3f},neg:{:.3f},neu:{:.3f}, pos:{:.3f}'
         #                    .format(hp[text_id][0], hp[text_id][3]['compound'],
@@ -364,11 +449,10 @@ def compound_sentiments(hp):
         #                            hp[text_id][3]['neu'],
         #                            hp[text_id][3]['pos']))
         # module_logger.info('{:45} compound:{:.3f}, languages: {}, main language: {}, language 2 {}'
-        module_logger.info('{:45} compound:{:.3f}, main language: {}, language2: {}'
-                           .format(hp[messageId][0], hp[messageId][3]['compound'],
-                                   # str(hp[message_Id][2]),
-                                   str(hp[messageId][4]),
-                                   str(hp[messageId][5]['language'])))
+        module_logger.debug('{:45} compound:{:.3f}, main language: {}, language2: {}'
+                            .format(hp[messageId][0], hp[messageId][2]['compound'],
+                                    str(hp[messageId][3]),
+                                    str(hp[messageId][4]['language'])))
 
     return hp
 
@@ -380,42 +464,39 @@ def emotion_sentiments(hp):
     '''
     p = None
     # data = {'file': [], 'message_Id': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
-    data = {'message_Id': [], 'subject': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
+    data = {'message_Id': [], 'subject': [], 'text': [], 'language': []}
     hp_df = None
 
     for messageId in hp:
         subject = hp[messageId][0]
         #         print('   ', chapter, title)
         text = ' '.join(hp[messageId][1]).replace('\n', '').replace('\r', ' ')
-        language = hp[messageId][4]
-        language2 = hp[messageId][5]
-        # data['file'].append(json_f)
+        language = detect_language(text)
         data['message_Id'].append(messageId)
         data['subject'].append(subject)
         data['text'].append(text)
         data['language'].append(language)
-        data['language2'].append(language2['language'])
-        data['compound'].append(hp[messageId][3]['compound'])
 
     hp_df = pd.DataFrame(data=data)
+
     hp_df = text_emotion(hp_df, 'text')
+
     index = hp_df.shape[0]
     index2 = 0
     while index2 < index:
         module_logger.info(
-            'subject:{} , language:{}, compound:{:.3f}, anger:{},  anticipation:{},  disgust:{},  fear:{},  joy:{}, '
+            'subject:{} , language:{}, anger:{},  anticipation:{},  disgust:{},  fear:{},  joy:{}, '
             ' negative:{},  positive:{},  sadness:{},  surprise:{},  trust:{}'
                 .format(hp_df.loc[index2].at['subject'], hp_df.loc[index2].at['language'],
-                        hp_df.loc[index2].at['compound'],
-                        hp_df.loc[index2].at['anger'], hp_df.loc[index2].at['anticipation'],
-                        hp_df.loc[index2].at['disgust'],
-                        hp_df.loc[index2].at['fear'], hp_df.loc[index2].at['joy'], hp_df.loc[index2].at['negative'],
-                        hp_df.loc[index2].at['positive'], hp_df.loc[index2].at['sadness'],
-                        hp_df.loc[index2].at['surprise'],
-                        hp_df.loc[index2].at['trust']))
+                        hp_df.loc[index2].at['Anger'], hp_df.loc[index2].at['Anticipation'],
+                        hp_df.loc[index2].at['Disgust'],
+                        hp_df.loc[index2].at['Fear'], hp_df.loc[index2].at['Joy'], hp_df.loc[index2].at['Negative'],
+                        hp_df.loc[index2].at['Positive'], hp_df.loc[index2].at['Sadness'],
+                        hp_df.loc[index2].at['Surprise'],
+                        hp_df.loc[index2].at['Trust']))
         index2 += 1
     # hp_df.iloc[index2, : ])
-    data = {'message_Id': [], 'subject': [], 'text': [], 'language': [], 'language2': [], 'compound': []}
+    data = {'message_Id': [], 'subject': [], 'text': [], 'language': []}
     return hp_df
 
 
@@ -437,7 +518,7 @@ def main():
             hp = compound_sentiments(hp)
 
         hp2 = message_matrix(jfile)
-        hp2 = compound_sentiments(hp2)
+        # hp2 = compound_sentiments(hp2)
         hp_df = emotion_sentiments(hp2)
 
 

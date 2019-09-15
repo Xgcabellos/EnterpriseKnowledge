@@ -428,7 +428,9 @@ class TextProcess:
 
     @staticmethod
     def remove_stopwords(words, language='english'):
-        """Remove stop words from list of tokenized words"""
+        """Remove stop words from list of tokenized words
+        :rtype: object
+        """
         new_words = []
         for word in words:
             if word not in stopwords.words(language):
@@ -462,26 +464,21 @@ class TextProcess:
         words = TextProcess.to_lowercase(words)
         words = TextProcess.remove_punctuation(words)
         # words = TextProcess.replace_numbers(words)
-        # try:
-        #     words = TextProcess.remove_stopwords(words,language)
-        # except Exception as stopwordsException:
-        #     module_logger.error(stopwordsException)
+        try:
+            words = TextProcess.remove_stopwords(words, language)
+        except Exception as stopwordsException:
+            module_logger.error(stopwordsException)
         return words
 
     @staticmethod
     def normalize_text(text, language='english'):
+        words = []
         text = TextProcess.strip_html(text)
         text = TextProcess.remove_between_square_brackets(text)
-        try:
-            words = nltk.word_tokenize(text, language)
-        except Exception as tokenizeException:
-            module_logger.error('{} produce tokenizeException with language {}'.format(text, language))
-            return text
-        try:
-            words = TextProcess.normalize(words, language)
-        except Exception as normalizeException:
-            module_logger.error('{} produce normalizeException with language {}'.format(text, language))
-        return ' '.join(words)
+        words = nltk.word_tokenize(text, language)
+        words = TextProcess.normalize(words, language)
+        return words
+
 
 
 class Paragraph(object):

@@ -1,9 +1,10 @@
 # version v1.1
 import configparser
-from logging import getLogger, debug, warning, DEBUG
+from logging import getLogger, debug, warning, INFO
 
 from pymongo import MongoClient
 
+from sentiment_process import reading_json_files
 from storage_email import StorageEmail
 from text_process import log_level_conversor
 
@@ -60,6 +61,10 @@ class mongodb_storageEmail(StorageEmail):
         db = self.driver[database]
         emails = db.emails
         emails_stored = None
+        msg_list = [i for i in msg_list if 'Message-Id' in i]
+        for msg in msg_list:
+            msg['_id'] = msg['Message-Id']
+
         try:
             emails_stored = emails.insert_many(msg_list)
         except Exception as mongo_insert_many_exp:
@@ -71,7 +76,7 @@ class mongodb_storageEmail(StorageEmail):
                     self.logger.debug(str(i) + " Email key is: {}".format(str(result)))
                 except Exception as mongo_insert_one_exp:
                     self.logger.error('Error writing one msg in Mongo:{}'.format(mongo_insert_one_exp))
-                    self.logger.error(str(m))
+
 
         if emails_stored is not None:
             for m in emails_stored.inserted_ids:
@@ -171,28 +176,30 @@ class TopologyLogger(monitoring.TopologyListener):
 
 
 def main():
-    log_level_json = DEBUG
+    log_level_json = INFO
     json_directory = './json/'
-    users_file = "../input/users.csv"
-    books_directory = '../input/books/'
-    knowledge_file = "../input/knowledges.csv"
-    module_logger = getLogger('MongoDbStorageEmail')
 
     json_store = mongodb_storageEmail(None, log_name, log_level_json, log_directory)
     json_store.connect('localhost', 'admin', 'Gandalf6981', 'admin')
     import json
-    from bson.json_util import loads
-
-    with open(json_directory + 'xgcabellos.gmail0_INBOX.json', 'r') as f:
-        data = json.load(f)
+    json_file_list = reading_json_files(json_directory, 1000000)
+    module_logger.info('number of files: {}'.format(str(len(json_file_list))))
     json_list = []
-    for doc in data:
-        data_json = loads(json.dumps(doc))
-        json_list.append(data_json)
-    json_store.store(json_list)
+    for json_file in json_file_list:
+        with open(json_file, 'r') as f:
+            data = json.load(f)
 
-    db = json_store.driver['eknowegdedb']
+        for doc in data:
+            # data_json = loads(json.dumps(doc))
+            json_list.append(doc)
+    module_logger.info('number of json: {}'.format(str(len(json_list))))
+    json_store.store(json_list, 'tuitravel-ad')
+
+    # json_store.store(json_list)
+
+    db = json_store.driver['tuitravel-ad']
     emails = db.emails
+    #emails.create_index()
     senders = [i for i in emails.distinct("From")]
 
     receivers = [i for i in emails.distinct("To")]

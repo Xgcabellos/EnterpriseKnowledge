@@ -7,12 +7,14 @@ import sys
 
 import email_process
 import pst_process
+from Sentiment_analysis import sentiment_analysis
 from connection_properties import email_IMAP_connexionProperties
 from connection_properties import google_connexionProperties
 from email_process import Gmail
 from employee_email_worker import read_users_info
 from graph_analytic_neo4j import Neo4jGhaphAnalytic
 from json_storage_email import JsonStorageEmail
+from mongodb_storage_analysis import mongodb_storage
 from mongodb_storage_email import mongodb_storageEmail
 from neo4j_storage_email import neo4J_storageEmail
 from text_process import log_level_conversor
@@ -373,6 +375,8 @@ def main():
     # statistics
     # summary(all_messages)
 
+    # Graph analysis
+
     try:
         driver = GraphDatabase.driver("bolt://" + GRAPHDDBB_SERVER + ":7687",
                                       auth=(config['CONNECTION']['GRAPHDDBB_LOGIN'],
@@ -383,6 +387,32 @@ def main():
     graph = Neo4jGhaphAnalytic(driver, log_name, log_level, log_directory)
     graph.analysis()
     module_logger.info('exit GraphDatabase: %s')
+
+    # sentiment analysis
+
+    if JSON_STORE_TYPE == 'mongoDB':
+        try:
+            json_store = mongodb_storage(None, log_name, log_level_json, log_directory)
+            json_store.connect(config['CONNECTION']['MONGODB_SERVER'], config['CONNECTION']['MONGODB_LOGIN'],
+                               config['CONNECTION']['MONGODB_PASSWORD'], config['CONNECTION']['MONGODB_DATABASE'])
+
+        except Exception as bErr:
+            module_logger.error('Error connecting mongoDB %s', bErr)
+            return 1
+
+        for index, user in usersinfo.iterrows():  # Reading all users
+            FROM_EMAIL = user['sername']  # from sername. the name is a mistake without any meaning.
+            ACTIVE = user['active']
+            if ACTIVE.upper() != 'Y':
+                continue
+            company = user['email'].split('@')[1]
+            module_logger.info('processing:{} '.format(FROM_EMAIL))
+            try:
+                sentiment_analysis(json_store, company, -1)
+            except Exception as sentimentAnalysisErr:
+                module_logger.error('Error connecting GraphDatabase: %s', sentimentAnalysisErr)
+            module_logger.info('finished  sentiment analysis of {} '.format(FROM_EMAIL))
+
     return 0
 
 

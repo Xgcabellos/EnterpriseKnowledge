@@ -8,11 +8,17 @@ from logging import Logger
 import contractions
 import inflect as inflect
 import nltk
+import spacy
 from bs4 import BeautifulSoup
 from bs4 import Comment
 # from email_reply_parser import EmailReplyParser
 from htmllaundry import sanitize
 from nltk.corpus import stopwords
+
+nlp_fr = spacy.load('fr_core_news_sm')
+nlp_de = spacy.load('de_core_news_sm')
+nlp_es = spacy.load('es_core_news_sm')
+nlp_en = spacy.load('en_core_web_sm')
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -458,6 +464,33 @@ class TextProcess:
         return lemmas
 
     @staticmethod
+    def lemmatizer(text, language):
+        """Lemmatize verbs in list of tokenized words"""
+        sent = []
+        nlp = None
+        if language == 'spanish':
+            nlp = nlp_es
+
+        elif language == 'english':
+            nlp = nlp_en
+
+        elif language == 'french':
+            nlp = nlp_fr
+
+        elif language == 'german':
+            nlp = nlp_de
+
+        else:
+            nlp = nlp_en
+
+        doc = nlp(text)
+        for word in doc:
+            sent.append(word.lemma_)
+        return " ".join(sent)
+
+
+
+    @staticmethod
     def normalize(words, language='english'):
 
         words = TextProcess.remove_non_ascii(words)
@@ -478,7 +511,6 @@ class TextProcess:
         words = nltk.word_tokenize(text, language)
         words = TextProcess.normalize(words, language)
         return words
-
 
 
 class Paragraph(object):
@@ -551,9 +583,6 @@ def detect_language_spacy(text):
     # for i, sent in enumerate(doc.sents):
     #    print(sent, sent._.language)
     return doc._.language
-
-
-
 
 
 def main():

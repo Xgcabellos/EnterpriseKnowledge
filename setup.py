@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='EKnowledge',
-    version='0.1',
+    version='0.28',
     packages=[ '' ],
     url='https://github.com/Xgcabellos/EnterpriseKnowledge.git',
     license='Copyright Xavier Garcia Cabellos & Alvaro Roman',
@@ -10,5 +10,8 @@ setup(
     author_email='xgcabellos@Gmail.com',
     description='Email interpreter as internal relationship of the company ', install_requires=['psutil', 'inflect',
                                                                                                 'nltk', 'neo4j',
-                                                                                                'vaderSentiment']
+                                                                                                'vaderSentiment',
+                                                                                                'spacy', 'htmllaundry',
+                                                                                                'beautifulsoup4',
+                                                                                                'contractions']
 )

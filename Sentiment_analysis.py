@@ -139,4 +139,4 @@ if __name__ == '__main__':
     json_store = mongodb_storage()
     json_store.connect('localhost', 'admin', 'Gandalf6981', 'admin')
     company = 'tuitravel-ad'
-    sentiment_analysis(json_store, company, 100)
+    sentiment_analysis(json_store, company, -1)

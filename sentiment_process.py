@@ -1,6 +1,7 @@
 import configparser
 import json
 import logging
+import os
 import warnings
 from collections import defaultdict
 from logging import Logger
@@ -16,21 +17,12 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # nltk.download()
 
-# Plotting tools
-import matplotlib.pyplot as plt
-
-plt.style.use('fivethirtyeight')
-# %matplotlib  inline
-import os
-# Set Pandas to display all rows of dataframes
 
 # nltk
 from nltk import tokenize, wordpunct_tokenize
 import pandas as pd
 
 # spaCy
-import spacy
-from spacy_langdetect import LanguageDetector
 
 pd.set_option('display.max_rows', 500)
 
@@ -100,36 +92,9 @@ filepathml = ('data/'
 # emolex_df = pd.read_csv(filepath, names=["word", "emotion", "association"], sep='\t')
 # emolex_words = emolex_df.pivot(index='word', columns='emotion', values='association').reset_index()
 # emotions = emolex_words.columns.drop('word')
-
-emolex_dfml = pd.read_excel(filepathml)
-print(emolex_dfml.head())
-fields_english = emolex_dfml.loc[:, 'English (en)']
-fields_spanish = emolex_dfml.loc[:, 'Spanish (es)']
-fields_french = emolex_dfml.loc[:, 'French (fr)']
-fields_german = emolex_dfml.loc[:, 'German (de)']
-
-emotions_ml = emolex_dfml.columns.to_list()
-emotions_ml = emotions_ml[105:]
-emotions_only = emolex_dfml.loc[:, emotions_ml]
-
-emolex_english = pd.concat([fields_english, emotions_only], axis=1)
-emolex_english.set_index('English (en)')
-emolex_spanish = pd.concat([fields_spanish, emotions_only], axis=1)
-emolex_spanish.set_index('Spanish (es)')
-emolex_french = pd.concat([fields_french, emotions_only], axis=1)
-emolex_french.set_index('French (fr)')
-emolex_german = pd.concat([fields_german, emotions_only], axis=1)
-emolex_german.set_index('German (de)')
-
-stemmer_english = nltk.SnowballStemmer('english')
-stemmer_spanish = nltk.SnowballStemmer('spanish')
-stemmer_french = nltk.SnowballStemmer('french')
-stemmer_german = nltk.SnowballStemmer('german')
-
 # Load info for spaCy find language
-nlp = spacy.load("en")
-nlp.add_pipe(LanguageDetector(), name="language_detector", last=True)
-
+# nlp = spacy.load("en")
+# nlp.add_pipe(LanguageDetector(), name="language_detector", last=True)
 
 class sentimentProcess:
     title = ""  # for subject
@@ -178,16 +143,17 @@ def detect_language(text):
     return DEFAULT_LANGUAGE
 
 
-def detect_language_spacy(text):
-    # aprox 60 times slower
-    doc = nlp(text)
-
-    # document level language detection. Think of it like average language of document!
-    # print(doc._.language['language'])
-    # sentence level language detection
-    # for i, sent in enumerate(doc.sents):
-    #    print(sent, sent._.language)
-    return doc._.language
+#
+# def detect_language_spacy(text):
+#     # aprox 60 times slower
+#     doc = nlp(text)
+#
+#     # document level language detection. Think of it like average language of document!
+#     # print(doc._.language['language'])
+#     # sentence level language detection
+#     # for i, sent in enumerate(doc.sents):
+#     #    print(sent, sent._.language)
+#     return doc._.language
 
 
 def text_emotion(df, column):
@@ -198,8 +164,35 @@ def text_emotion(df, column):
     INPUT: DataFrame, string
     OUTPUT: the original DataFrame with ten new columns
     """
-    LANGUAGES_ACEPTED = ['english', 'spanish', 'french', 'german']
+    LANGUAGES_ACCEPTED = ['english', 'spanish', 'french', 'german']
     new_df = df.copy()
+
+    emolex_dfml = pd.read_excel(filepathml)
+    print(emolex_dfml.head())
+    fields_english = emolex_dfml.loc[:, 'English (en)']
+    fields_spanish = emolex_dfml.loc[:, 'Spanish (es)']
+    fields_french = emolex_dfml.loc[:, 'French (fr)']
+    fields_german = emolex_dfml.loc[:, 'German (de)']
+
+    emotions_ml = emolex_dfml.columns.to_list()
+    emotions_ml = emotions_ml[105:]
+    emotions_only = emolex_dfml.loc[:, emotions_ml]
+
+    emolex_english = pd.concat([fields_english, emotions_only], axis=1)
+    emolex_english.set_index('English (en)')
+    emolex_spanish = pd.concat([fields_spanish, emotions_only], axis=1)
+    emolex_spanish.set_index('Spanish (es)')
+    emolex_french = pd.concat([fields_french, emotions_only], axis=1)
+    emolex_french.set_index('French (fr)')
+    emolex_german = pd.concat([fields_german, emotions_only], axis=1)
+    emolex_german.set_index('German (de)')
+
+    stemmer_english = nltk.SnowballStemmer('english')
+    stemmer_spanish = nltk.SnowballStemmer('spanish')
+    stemmer_french = nltk.SnowballStemmer('french')
+    stemmer_german = nltk.SnowballStemmer('german')
+
+
 
     emo_df = pd.DataFrame(0, index=df.index, columns=emotions_ml)
 
@@ -220,9 +213,9 @@ def text_emotion(df, column):
         if row['language'] != language:
             # print('   ', row['message_Id'])
             language = row['language']
-            if language not in LANGUAGES_ACEPTED:
+            if language not in LANGUAGES_ACCEPTED:
                 language = detect_language(new_df.loc[i][column])
-                if language not in LANGUAGES_ACEPTED:
+                if language not in LANGUAGES_ACCEPTED:
                     language = DEFAULT_LANGUAGE
         # if row['language2'] != language2:
         #     # print('   ', row['message_Id'])
@@ -266,9 +259,10 @@ def text_emotion(df, column):
 
         try:
             module_logger.info('tokenize {}'.format(str(new_df.loc[i][column])))
-            document = text_process.TextProcess.normalize_text(new_df.loc[i][column])
-            if language == 'english':
-                document = text_process.TextProcess.lemmatize_verbs(document)
+            text = text_process.TextProcess.lemmatizer(new_df.loc[i][column], language)
+            document = text_process.TextProcess.normalize_text(text)
+            # if language == 'english':
+            #     document = text_process.TextProcess.lemmatize_verbs(document)
 
             # for word in document:
             #     word = stemmer.stem(word.lower())
@@ -336,8 +330,11 @@ def message_matrix(data):
 
     for doc in data:
         proc = text_process.TextProcess(True)  # not visualization of replies
-        proc.paraphs_message(doc)
-        doc_list.append(proc)
+        try:
+            proc.paraphs_message(doc)
+            doc_list.append(proc)
+        except Exception as TextProcessException:
+            module_logger.error(TextProcessException)
     module_logger.info('processing {} messages....'.format(str(len(doc_list))))
 
     # write matrix with a list of paragraphs

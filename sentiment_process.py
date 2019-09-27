@@ -514,6 +514,12 @@ def main():
             # hp = message_matrix(jfile)
             hp = compound_sentiments(hp)
 
+        for messageId in hp:
+            module_logger.debug('{:45} compound:{:.3f}, main language: {}, language2: {}'
+                                .format(hp[messageId][0], hp[messageId][2]['compound'],
+                                        str(hp[messageId][3]),
+                                        str(hp[messageId][4]['language'])))
+
         hp2 = message_matrix(jfile)
         # hp2 = compound_sentiments(hp2)
         hp_df = emotion_sentiments(hp2)

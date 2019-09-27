@@ -25,6 +25,7 @@ from py._xmlgen import unicode
 from Sentiment_analysis import sentimentAnalysis
 from abstract_process import AbstractEmail
 from connection_properties import email_DUMMY_connexionProperties
+from sentiment_process import message_row, compound_sentiments
 from text_process import TextProcess, log_level_conversor
 
 # from os import makedirs,getoid
@@ -475,6 +476,18 @@ class Gmail(AbstractEmail):
                 self.logger.debug('Read ' + str(len(email_list)) + ' email messages in ' + name_folder)
                 jsonified_messages = self.jsonizer_emails(email_list)
                 self.logger.debug('prepared ' + str(len(jsonified_messages)) + ' json messages in ' + name_folder)
+                ##################################
+                # Sentiments
+                for doc in jsonified_messages:
+                    sentiments = message_row(doc)
+                    sentiments = compound_sentiments(sentiments)
+
+                for messageId in sentiments:
+                    module_logger.debug('{:45} compound:{:.3f}, main language: {}, language2: {}'
+                                        .format(sentiments[messageId][0], sentiments[messageId][2]['compound'],
+                                                str(sentiments[messageId][3]),
+                                                str(sentiments[messageId][4]['language'])))
+                ##################################
 
                 if self.json_store.storage_type() == 'file':
                     self.json_store.store(jsonified_messages, self.json_directory, file)
